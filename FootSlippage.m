@@ -18,21 +18,46 @@ AbrevFileNames = erase(FullFileNames, "_");
 % Main loop to plot each data set
 for i = 1:numel(FullFileNames)
     data = parse_tracker_data(strcat("TrackerFiles/",FullFileNames(i)));
-    plot_data(data, i, AbrevFileNames)
+    neg_dx_indices = euler_approx(data);
+    plot_data(data, i, AbrevFileNames, neg_dx_indices);
 end
 
 
 % Function for plotting data
-function plot_data(data, i, AbrevFileNames)
+function plot_data(data, i, AbrevFileNames, neg_dx_indices)
 
     figure(i)
+    hold on
     plot(data.x, data.t);
     xlabel("X-Position (m)")
     ylabel("Time (s)")
     title(strcat("X Position for ", AbrevFileNames(i)))
+    scatter(data.x(neg_dx_indices), data.t(neg_dx_indices), '*r');
+    legend("Foot Position", "Slippage Detected", 'location', 'northwest');
     grid on;
+    hold off
     
 end
+
+% Function for finding dx/dt
+
+function neg_dx_indices = euler_approx(data)
+
+    dx(1) = 0;
+    x = data.x;
+    t = data.t;
+
+    for i = 2:numel(x)
+        dx(i) = (x(i) - x(i-1)) / (t(i) - t(i-1));
+    end
+
+    neg_dx_indices = find(dx < 0);
+
+
+end
+
+
+
 
 % Function for sorting data
 
