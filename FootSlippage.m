@@ -19,7 +19,8 @@ AbrevFileNames = erase(FullFileNames, ["_", ".txt"]);
 for i = 1:numel(FullFileNames)
     data = parse_tracker_data(strcat("TrackerFiles/",FullFileNames(i)));
     neg_dx_indices = find_slip(data);
-    plot_data(data, i, AbrevFileNames, neg_dx_indices);
+    chop_index = chop_data(data, 3.5);
+    plot_data(data, i, AbrevFileNames, neg_dx_indices, chop_index);
 end
 
 %% Functions
@@ -27,21 +28,30 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% Function for plotting data
-function plot_data(data, i, AbrevFileNames, neg_dx_indices)
+function plot_data(data, i, AbrevFileNames, neg_dx_indices, chop_index)
 
     figure(i)
     hold on
-    plot(data.x, data.t);
-    xlabel("X-Position (m)")
-    ylabel("Time (s)")
+    xlim([0, data.t(chop_index)]);
+    plot(data.t(1:chop_index), data.x(1:chop_index), "LineWidth",3.5);
+    ylabel("X-Position (m)")
+    xlabel("Time (s)")
     title(strcat("X Position for ", AbrevFileNames(i)))
-    scatter(data.x(neg_dx_indices), data.t(neg_dx_indices), '*r');
+    scatter(data.t(neg_dx_indices), data.x(neg_dx_indices), 75, 'xr', 'LineWidth',1.5);
     legend("Foot Position", "Slippage Detected", 'location', 'northwest');
     grid on;
     hold off
     
 end
 
+%% Function for chopping off data at a given time
+
+function chop_index = chop_data(unchopped_data, end_time)
+
+    chop_index = find(unchopped_data.t >= end_time, 1, 'first');
+
+
+end
 %% Function for finding dx/dt
 
 function neg_vx_indices = find_slip(data)
