@@ -8,22 +8,25 @@ jjv20@fsu.edu
 %}
 clc; clear all; close all; format compact
 
-%%
 
-% Sorting file Names
+
+%% Sorting file Names
 FileNames = string(ls("TrackerFiles"));
 FullFileNames = FileNames(3:end, :);
-AbrevFileNames = erase(FullFileNames, "_");
+AbrevFileNames = erase(FullFileNames, ["_", ".txt"]);
 
-% Main loop to plot each data set
+%% Main loop to plot each data set
 for i = 1:numel(FullFileNames)
     data = parse_tracker_data(strcat("TrackerFiles/",FullFileNames(i)));
     neg_dx_indices = find_slip(data);
     plot_data(data, i, AbrevFileNames, neg_dx_indices);
 end
 
+%% Functions
 
-% Function for plotting data
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% Function for plotting data
 function plot_data(data, i, AbrevFileNames, neg_dx_indices)
 
     figure(i)
@@ -39,20 +42,16 @@ function plot_data(data, i, AbrevFileNames, neg_dx_indices)
     
 end
 
-% Function for finding dx/dt
+%% Function for finding dx/dt
 
 function neg_vx_indices = find_slip(data)
 
    vx = data.vx;
    neg_vx_indices = find(vx<0);
 
-
 end
 
-
-
-
-% Function for sorting data
+%% Function for sorting data
 
 function data = parse_tracker_data(input_file)
 
