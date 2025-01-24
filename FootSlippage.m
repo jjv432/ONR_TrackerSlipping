@@ -63,7 +63,8 @@ function data = parse_tracker_data(input_file)
     % Sort file into each column
     %{
 For whatever reason, not all of the files had the same number of columns.
-This is a quick and dirty solution to this.
+This is a quick and dirty solution to this.  The small ones don't have
+columns for the following values: r, v, a.  
     %}
 
     if cur_col_size == 7
