@@ -26,7 +26,7 @@ end
 function plot_data(data, i, AbrevFileNames)
 
     figure(i)
-    plot(data.x, data.t)
+    plot(data.x, data.t);
     xlabel("X-Position (m)")
     ylabel("Time (s)")
     title(strcat("X Position for ", AbrevFileNames(i)))
