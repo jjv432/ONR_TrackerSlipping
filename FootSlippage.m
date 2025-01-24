@@ -26,9 +26,9 @@ end
 function plot_data(data, i, AbrevFileNames)
 
     figure(i)
-    plot(data.t, data.x)
-    xlabel("Time(s)")
-    ylabel("X Position (m)")
+    plot(data.x, data.t)
+    xlabel("X-Position (m)")
+    ylabel("Time (s)")
     title(strcat("X Position for ", AbrevFileNames(i)))
     grid on;
     
