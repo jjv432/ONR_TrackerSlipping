@@ -18,7 +18,7 @@ AbrevFileNames = erase(FullFileNames, "_");
 % Main loop to plot each data set
 for i = 1:numel(FullFileNames)
     data = parse_tracker_data(strcat("TrackerFiles/",FullFileNames(i)));
-    neg_dx_indices = euler_approx(data);
+    neg_dx_indices = find_slip(data);
     plot_data(data, i, AbrevFileNames, neg_dx_indices);
 end
 
@@ -41,17 +41,10 @@ end
 
 % Function for finding dx/dt
 
-function neg_dx_indices = euler_approx(data)
+function neg_vx_indices = find_slip(data)
 
-    dx(1) = 0;
-    x = data.x;
-    t = data.t;
-
-    for i = 2:numel(x)
-        dx(i) = (x(i) - x(i-1)) / (t(i) - t(i-1));
-    end
-
-    neg_dx_indices = find(dx < 0);
+   vx = data.vx;
+   neg_vx_indices = find(vx<0);
 
 
 end
