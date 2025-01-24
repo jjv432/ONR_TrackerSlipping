@@ -6,9 +6,16 @@ jjv20@fsu.edu
 1/23/25
 
 %}
-clc; clear all; close all; format compact
+clc; clearvars -except data; close all; format compact
 
+% Some hard-coded values to make zoomed-in plots
+beginningIndex = [32, 36, 70];
+endIndex = [92, 62, 85];
 
+% Making indices for different gait events
+
+slipIndices1 = [3, 9, 17, 20];
+stanceIndices1 = [1, 3, 9, 17, 20, 29]
 
 %% Sorting file Names
 FileNames = string(ls("TrackerFiles"));
@@ -19,20 +26,40 @@ AbrevFileNames = erase(FullFileNames, ["_", ".txt"]);
 for i = 1:numel(FullFileNames)
     data = parse_tracker_data(strcat("TrackerFiles/",FullFileNames(i)));
     neg_dx_indices = find_slip(data);
-    chopped_data = chop_data
-    plot_data(data, i, AbrevFileNames, neg_dx_indices);
+    chop_index = chop_data(data, 3.5);
+    % plot_data(data, i, AbrevFileNames, neg_dx_indices, chop_index);
+    plot_gait(data, i, AbrevFileNames, neg_dx_indices, beginningIndex(i), endIndex(i))
 end
 
 %% Functions
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% Function for plotting data
-function plot_data(data, i, AbrevFileNames, neg_dx_indices)
 
-    figure(i)
+%% Function for plotting one gait cycle
+
+function plot_gait(data, i, AbrevFileNames, neg_dx_indices, beginningIndex, endIndex)
+    figure()
     hold on
-    plot(data.t, data.x, "LineWidth",3.5);
+    xlim([data.t(beginningIndex), data.t(endIndex)]);
+    plot(data.t(beginningIndex:endIndex), data.x(beginningIndex:endIndex), "LineWidth",3.5);
+    ylabel("X-Position (m)")
+    xlabel("Time (s)")
+    title(strcat("X Position for ", AbrevFileNames(i)))
+    scatter(data.t(neg_dx_indices), data.x(neg_dx_indices), 75, 'xr', 'LineWidth',1.5);
+    legend("Foot Position", "Slippage Detected", 'location', 'northwest');
+    grid on;
+    hold off
+
+
+end
+%% Function for plotting data
+function plot_data(data, i, AbrevFileNames, neg_dx_indices, chop_index)
+
+    figure()
+    hold on
+    xlim([0, data.t(chop_index)]);
+    plot(data.t(1:chop_index), data.x(1:chop_index), "LineWidth",3.5);
     ylabel("X-Position (m)")
     xlabel("Time (s)")
     title(strcat("X Position for ", AbrevFileNames(i)))
@@ -45,10 +72,9 @@ end
 
 %% Function for chopping off data at a given time
 
-function data = chop_data(unchopped_data, end_time)
+function chop_index = chop_data(unchopped_data, end_time)
 
-    chop_index = find(data.t >= end_time, 'first');
-    data = unchopped_data(1:chop_index);
+    chop_index = find(unchopped_data.t >= end_time, 1, 'first');
 
 
 end
@@ -78,18 +104,18 @@ columns for the following values: r, v, a.
     %}
 
     if cur_col_size == 7
-        data.t = temp(:, 1);
-        data.x = temp(:, 2);
-        data.y = temp(:, 3);        
+        data.t = temp(:, 1)- temp(1,1);
+        data.x = temp(:, 2)- temp(1,2);
+        data.y = temp(:, 3)- temp(1,3);        
         data.vx = temp(:, 4);
         data.vy = temp(:, 5);
         data.ax = temp(:, 6);
         data.ay = temp(:, 7);
 
     elseif cur_col_size == 10
-        data.t = temp(:, 1);
-        data.x = temp(:, 2);
-        data.y = temp(:, 3);
+        data.t = temp(:, 1)- temp(1,1);
+        data.x = temp(:, 2)- temp(1,2);
+        data.y = temp(:, 3)- temp(1,3);
         data.r = temp(:, 4);
         data.vx = temp(:, 5);
         data.vy = temp(:, 6);
