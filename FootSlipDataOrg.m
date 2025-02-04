@@ -15,6 +15,9 @@ being made (comment is in there with more detail)
 May also need to normalize all of the x values.
 
 Eventually, move sections to their own functions
+
+There's somthing about the 0p5 Hz trial that is causing stride 4 to have
+one less index than all of the other strides...
 %}
 %% Sorting file Names
 FileNames = string(ls("TrackerFiles"));
@@ -110,6 +113,11 @@ for i = 1:numel(FullFileNames)
     x_tot = [];
     for k = 1:cur_num_strides
         cur_x = Data.(AbrevFileNames(i)).(strcat("Stride_", num2str(k))).x;
+
+        % Horrible fix to this, but not sure how else to fix this issue
+        if (k == 4 && contains(FullFileNames(i), "0p5"))
+            cur_x = [cur_x; cur_x(end)];
+        end
         % This works because we're assuming dt is constant
         x_tot = [x_tot; cur_x'];
 
