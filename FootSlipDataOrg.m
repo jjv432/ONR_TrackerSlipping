@@ -58,6 +58,7 @@ for i = 1:numel(FullFileNames)
     hold on
     num_trials = numel(t_vals);
     
+    % Make sure not ending too soon, add end time?
     for k = 2:num_trials
         
         curX = Data.(AbrevFileNames(i)).x(t_vals_idx(k-1):t_vals_idx(k));
