@@ -17,7 +17,12 @@ May also need to normalize all of the x values.
 Eventually, move sections to their own functions
 
 There's somthing about the 0p5 Hz trial that is causing stride 4 to have
-one less index than all of the other strides...
+one less index than all of the other strides... curently have a not so
+great fix for it
+
+Add more helpful titles- base it off frequency/ file name
+
+Combine functions where they don't need to be seperate.
 %}
 %% Sorting file Names
 FileNames = string(ls("TrackerFiles"));
