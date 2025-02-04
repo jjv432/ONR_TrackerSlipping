@@ -41,8 +41,35 @@ for i = 1:numel(FullFileNames)
         frequency = 4.0;
     end
 
-    frequency
+    % Now, splitting each stride into its own field
+    StartIndex = Data.(AbrevFileNames(i)).StartIndex;
+    t_not = Data.(AbrevFileNames(i)).t(StartIndex);
+    t_end = Data.(AbrevFileNames(i)).t(end);
+    dt = 1/frequency;
+    t_vals = t_not:dt:t_end;
 
+    % [~, t_vals_idx_1] = find(t_vals <= 1.01*Data.(AbrevFileNames(i)).t );
+  
+    %\cite{https://www.mathworks.com/matlabcentral/answers/152301-find-closest-value-in-array#comment_2806253}
+    [~, t_vals_idx] = min(abs(Data.(AbrevFileNames(i)).t - t_vals));
+  
+
+    figure();
+    hold on
+    num_trials = numel(t_vals);
+    
+    for k = 2:num_trials
+        
+        curX = Data.(AbrevFileNames(i)).x(t_vals_idx(k-1):t_vals_idx(k));
+        curT = Data.(AbrevFileNames(i)).t(t_vals_idx(k-1):t_vals_idx(k));
+        
+        Data.(AbrevFileNames(i)).(strcat("Stride_", num2str(k-1))).x = curX;
+        Data.(AbrevFileNames(i)).(strcat("Stride_", num2str(k-1))).t = curT;
+
+        subplot(round(num_trials/2), 2, k-1);
+        plot(curT, curX);
+        
+    end
 
 end
 
