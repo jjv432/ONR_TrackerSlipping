@@ -35,4 +35,6 @@ columns for the following values: r, v, a.
         data.ay = temp(:, 9);
         data.a = temp(:, 10);
     end
+
+    data.StartIndex = [];
 end
