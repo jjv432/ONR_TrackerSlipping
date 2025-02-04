@@ -24,9 +24,9 @@ AbrevFileNames = erase(FullFileNames, ["_", ".txt"]);
 %% Putting The Tracker Data into fields
 % % Note: this function will reset the start index as of now
 % for i = 1:numel(FullFileNames)
-%
+% 
 %     Data.(AbrevFileNames(i)) = parse_tracker_data(string(FullFileNames(i)));
-%
+% 
 % end
 
 %% Finding out where the starting index is for each plot
@@ -52,6 +52,8 @@ for i = 1:numel(FullFileNames)
         frequency = 2.5;
     elseif contains(FullFileNames(i), "_4p0Hz")
         frequency = 4.0;
+    elseif contains(FullFileNames(i), "_0p5Hz")
+        frequency = 0.5;
     end
     Data.(AbrevFileNames(i)).frequency = frequency;
 
