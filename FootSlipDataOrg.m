@@ -44,6 +44,7 @@ for i = 1:numel(FullFileNames)
     elseif contains(FullFileNames(i), "_4p0Hz")
         frequency = 4.0;
     end
+    Data.(AbrevFileNames(i)).frequency = frequency;
 
     % Now, splitting each stride into its own field
     StartIndex = Data.(AbrevFileNames(i)).StartIndex;
@@ -97,18 +98,13 @@ for i = 1:numel(FullFileNames)
     % Taking the mean and std dev by column (each dt)
     mean_x = mean(x_tot, 1);
     std_x = std(x_tot, 0, 1);
-    [~,max_index]= max(x_tot,[], 1);
-    helper_column = 1:numel(max_index);
-    max_x_vals = x_tot(helper_column, max_index);
-
+   
     Data.(AbrevFileNames(i)).mean_x = mean_x;
     Data.(AbrevFileNames(i)).std_x = std_x;
 
-    
     Data.(AbrevFileNames(i)).mean_x = mean_x;
-    num_dts = numel(mean_x);
-    cur_tvals = Data.(AbrevFileNames(i)).t_vals;
-    cur_x_axis = 1:num_dts;
+    
+    cur_x_axis = Data.(AbrevFileNames(i)).(strcat("Stride_", num2str(k))).t';
     figure();
     hold on
     % \cite{https://www.mathworks.com/matlabcentral/answers/1928100-create-plot-with-shaded-standard-deviation-but#answer_1192320}
@@ -116,7 +112,7 @@ for i = 1:numel(FullFileNames)
 
     fill([cur_x_axis, flip(cur_x_axis)], [mean_x + std_x, flip(mean_x - std_x)], [0.8 0.8 0.8]);
     plot(cur_x_axis, mean_x, '--k');
-    plot(cur_x_axis, max_x_vals, '--k');
+    % plot(cur_x_axis, max_x_vals, '--k');
     hold off
 
 end
