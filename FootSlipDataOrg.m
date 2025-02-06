@@ -2,7 +2,7 @@ clc; clearvars -except Data; close all; format compact;
 
 addpath("SlippingFunctions");
 addpath("TrackerFiles");
-
+addpath("Figures");
 %{
 
 TO-DO
@@ -23,13 +23,18 @@ great fix for it
 Add more helpful titles- base it off frequency/ file name
 
 Combine functions where they don't need to be seperate.
+
+Make sure all of the data is ending up in the plot
+
+Add in a way to save the data struct- maybe don't call a few functions when
+data struct can be loaded instead
 %}
 %% Sorting file Names
 FileNames = string(ls("TrackerFiles"));
 FullFileNames = FileNames(3:end, :);
 AbrevFileNames = erase(FullFileNames, ["_", ".txt"]);
 
-%% Putting The Tracker Data into fields
+% %% Putting The Tracker Data into fields
 % % Note: this function will reset the start index as of now
 % for i = 1:numel(FullFileNames)
 % 
@@ -164,8 +169,11 @@ for i = 1:numel(FullFileNames)
     legend('', "Mean", "Max", "Min");
     xlabel("Time(s)");
     ylabel("Change in X-Position(m)");
-    title(strcat("Normalized X-Position for ", num2str(frequency), "Hz"));
+    title(strcat("Normalized X-Position for ", num2str(Data.(AbrevFileNames(i)).frequency), "Hz"));
     hold off
+    ylim([-.1 .2]);
+    saveas(gcf, strcat("Figures/", num2str(Data.(AbrevFileNames(i)).frequency), '.fig'));
+    
 
     clear max_x_vals min_x_vals
 
