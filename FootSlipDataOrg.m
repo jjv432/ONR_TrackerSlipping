@@ -77,7 +77,6 @@ for i = 1:numel(FullFileNames)
     dt = 1/frequency;
     t_vals = t_not:dt:t_end;
 
-    % [~, t_vals_idx_1] = find(t_vals <= 1.01*Data.(AbrevFileNames(i)).t );
 
     %\cite{https://www.mathworks.com/matlabcentral/answers/152301-find-closest-value-in-array#comment_2806253}
     [~, t_vals_idx] = min(abs(Data.(AbrevFileNames(i)).t - t_vals));
