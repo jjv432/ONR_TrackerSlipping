@@ -12,8 +12,6 @@ used.  Can concatenate in the "Sorting each trial by stride based on time
 alone" section.  Also in this section, ensure correct number of plots are
 being made (comment is in there with more detail)
 
-May also need to normalize all of the x values.
-
 Eventually, move sections to their own functions
 
 There's somthing about the 0p5 Hz trial that is causing stride 4 to have
@@ -24,23 +22,29 @@ Add more helpful titles- base it off frequency/ file name
 
 Combine functions where they don't need to be seperate.
 
-Make sure all of the data is ending up in the plot
-
 Add in a way to save the data struct- maybe don't call a few functions when
 data struct can be loaded instead
+
+Make a switch statement based on the behavior that the use desires?
+
 %}
+
+
 %% Sorting file Names
 FileNames = string(ls("TrackerFiles"));
 FullFileNames = FileNames(3:end, :);
 AbrevFileNames = erase(FullFileNames, ["_", ".txt"]);
 
 %% Putting The Tracker Data into fields
-% % Note: this function will reset the start index as of now
-% for i = 1:numel(FullFileNames)
-% 
-%     Data.(AbrevFileNames(i)) = parse_tracker_data(string(FullFileNames(i)));
-% 
-% end
+
+if ~exist('Data', 'var')
+    % Note: this function will reset the start index as of now
+    for i = 1:numel(FullFileNames)
+
+        Data.(AbrevFileNames(i)) = parse_tracker_data(string(FullFileNames(i)));
+
+    end
+end
 
 %% Finding out where the starting index is for each plot
 
@@ -171,12 +175,12 @@ for i = 1:numel(FullFileNames)
 
             TempFrequencyField = rmfield(TempFrequencyField, strcat("Stride_", num2str(b)));
         end
-        
+
         TempData.(AbrevFileNames(i)) = TempFrequencyField;
         Data = TempData;
     end
 
-    
+
 
 end
 
@@ -254,4 +258,10 @@ for i = 1:numel(FullFileNames)
 end
 
 
+%% Asking the user if they want to save these results
 
+save_answer = input("Want to save these results to a .json file? (y/n)", 's');
+
+if save_answer == 'y'
+    writestruct(Data, 'Data.json');
+end
