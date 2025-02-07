@@ -34,12 +34,12 @@ FileNames = string(ls("TrackerFiles"));
 FullFileNames = FileNames(3:end, :);
 AbrevFileNames = erase(FullFileNames, ["_", ".txt"]);
 
-% %% Putting The Tracker Data into fields
+%% Putting The Tracker Data into fields
 % % Note: this function will reset the start index as of now
 % for i = 1:numel(FullFileNames)
-% 
+%
 %     Data.(AbrevFileNames(i)) = parse_tracker_data(string(FullFileNames(i)));
-% 
+%
 % end
 
 %% Finding out where the starting index is for each plot
@@ -83,29 +83,61 @@ for i = 1:numel(FullFileNames)
     Data.(AbrevFileNames(i)).t_vals = t_vals;
 
 
-    figure();
-    hold on
-    num_trials = numel(t_vals);
+    % figure();
+    % hold on
+    num_strides_extra = numel(t_vals);
+    Data.(AbrevFileNames(i)).num_strides = num_strides_extra - 1;
 
     % Make sure not ending too soon, add end time?
-    for k = 2:num_trials
+    for k = 1:num_strides_extra -1
 
-        curX = Data.(AbrevFileNames(i)).x(t_vals_idx(k-1):t_vals_idx(k));
-        curT = Data.(AbrevFileNames(i)).t(t_vals_idx(k-1):t_vals_idx(k));
+        curX = Data.(AbrevFileNames(i)).x(t_vals_idx(k):t_vals_idx(k+1));
+        curT = Data.(AbrevFileNames(i)).t(t_vals_idx(k):t_vals_idx(k+1));
 
         % Normalizing each stride
         curX = curX - curX(1);
         curT = curT - curT(1);
 
-        Data.(AbrevFileNames(i)).(strcat("Stride_", num2str(k-1))).x = curX;
-        Data.(AbrevFileNames(i)).(strcat("Stride_", num2str(k-1))).t = curT;
+        Data.(AbrevFileNames(i)).(strcat("Stride_", num2str(k))).x = curX;
+        Data.(AbrevFileNames(i)).(strcat("Stride_", num2str(k))).t = curT;
 
-        subplot(round(num_trials/2), 2, k-1);
-        plot(curT, curX);
+        % subplot(round(num_trials/2), 2, k-1);
+        % plot(curT, curX);
 
     end
 
 end
+
+
+%% Plotting the data so that you can see each stride
+
+%{
+A trial exists BETWEEN two vertical lines. 
+%}
+for i = 1:numel(FullFileNames)
+
+    figure()
+    hold on
+
+    plot(Data.(AbrevFileNames(i)).t, Data.(AbrevFileNames(i)).x);
+    accumulated_time = Data.(AbrevFileNames(i)).t(Data.(AbrevFileNames(i)).StartIndex);
+    xline(accumulated_time);
+    for k = 1:Data.(AbrevFileNames(i)).num_strides
+
+        cur_end_time = Data.(AbrevFileNames(i)).(strcat("Stride_", num2str(k))).t(end);
+
+        xline(cur_end_time + accumulated_time);
+
+        accumulated_time = accumulated_time + cur_end_time;
+
+    end
+    hold off
+    Data.(AbrevFileNames(i)).num_strides
+
+    keyboard();
+end
+
+
 
 %% Taking statistical data from each stride
 % Could combine this with the previous step to help with speed
@@ -172,7 +204,7 @@ for i = 1:numel(FullFileNames)
     hold off
     ylim([-.1 .2]);
     saveas(gcf, strcat("Figures/", num2str(Data.(AbrevFileNames(i)).frequency), '.fig'));
-    
+
 
     clear max_x_vals min_x_vals
 
