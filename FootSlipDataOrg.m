@@ -1,4 +1,4 @@
-clc; clearvars -except Data; close all; format compact;
+clc; close all; format compact;
 
 addpath("SlippingFunctions");
 addpath("TrackerFiles");
@@ -30,88 +30,12 @@ Make a switch statement based on the behavior that the use desires?
 %}
 
 
-%% Sorting file Names
-FileNames = string(ls("TrackerFiles"));
-FullFileNames = FileNames(3:end, :);
-AbrevFileNames = erase(FullFileNames, ["_", ".txt"]);
 
-%% Putting The Tracker Data into fields
+%% Only doing some functions if Data doesn't exist in the workspace
 
 if ~exist('Data', 'var')
-    % Note: this function will reset the start index as of now
-    for i = 1:numel(FullFileNames)
-
-        Data.(AbrevFileNames(i)) = parse_tracker_data(string(FullFileNames(i)));
-
-    end
+    [Data, FullFileNames, AbrevFileNames] = makeNewDataStruct();
 end
-
-%% Finding out where the starting index is for each plot
-
-for i = 1:numel(FullFileNames)
-    % Only 'ask' to pick a starting point if there isn't one saved yet
-    if isempty(Data.(AbrevFileNames(i)).StartIndex)
-        % call frame parser
-        StartIndex = frame_picker(Data.(AbrevFileNames(i)));
-        Data.(AbrevFileNames(i)).StartIndex = StartIndex;
-        close
-    end
-end
-
-%% Sorting each trial by stride based on time alone
-
-for i = 1:numel(FullFileNames)
-    % Need to figure out what the frequency of the take is. Relies on files
-    % being named consistently
-    if contains(FullFileNames(i), "_1p0Hz")
-        frequency = 1.0;
-    elseif contains(FullFileNames(i), "_2p5Hz")
-        frequency = 2.5;
-    elseif contains(FullFileNames(i), "_4p0Hz")
-        frequency = 4.0;
-    elseif contains(FullFileNames(i), "_0p5Hz")
-        frequency = 0.5;
-    end
-    Data.(AbrevFileNames(i)).frequency = frequency;
-
-    % Now, splitting each stride into its own field
-    StartIndex = Data.(AbrevFileNames(i)).StartIndex;
-    t_not = Data.(AbrevFileNames(i)).t(StartIndex);
-    t_end = Data.(AbrevFileNames(i)).t(end);
-    dt = 1/frequency;
-    t_vals = t_not:dt:t_end;
-
-
-    %\cite{https://www.mathworks.com/matlabcentral/answers/152301-find-closest-value-in-array#comment_2806253}
-    [~, t_vals_idx] = min(abs(Data.(AbrevFileNames(i)).t - t_vals));
-    Data.(AbrevFileNames(i)).t_vals = t_vals;
-
-
-    % figure();
-    % hold on
-    num_strides_extra = numel(t_vals);
-    Data.(AbrevFileNames(i)).num_strides = num_strides_extra - 1;
-
-    % Make sure not ending too soon, add end time?
-    for k = 1:num_strides_extra -1
-
-        curX = Data.(AbrevFileNames(i)).x(t_vals_idx(k):t_vals_idx(k+1));
-        curT = Data.(AbrevFileNames(i)).t(t_vals_idx(k):t_vals_idx(k+1));
-
-        % Normalizing each stride
-        curX = curX - curX(1);
-        curT = curT - curT(1);
-
-        Data.(AbrevFileNames(i)).(strcat("Stride_", num2str(k))).x = curX;
-        Data.(AbrevFileNames(i)).(strcat("Stride_", num2str(k))).t = curT;
-
-        % subplot(round(num_trials/2), 2, k-1);
-        % plot(curT, curX);
-
-    end
-
-end
-
 
 %% Plotting the data so that you can see each stride
 
@@ -165,6 +89,7 @@ for i = 1:numel(FullFileNames)
             looking_good = input("Does this look correct? (y/n)", 's');
             if looking_good == 'y'
                 looks_bad = 0;
+                % TempData.(AbrevFileNames(i)).num_strides = TempData.(AbrevFileNames(i)).num_strides - num_removal_answer - 1;
             end
 
         end
@@ -205,6 +130,7 @@ for i = 1:numel(FullFileNames)
         % Horrible fix to this, but not sure how else to fix this issue
         if (k == 4 && contains(FullFileNames(i), "0p5"))
             cur_x = [cur_x; cur_x(end)];
+            
         end
         % This works because we're assuming dt is constant
         x_tot = [x_tot; cur_x'];
