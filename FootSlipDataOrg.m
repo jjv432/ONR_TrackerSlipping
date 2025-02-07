@@ -1,4 +1,4 @@
-clc; close all; format compact;
+clc; clearvars -except Data; close all; format compact;
 
 addpath("SlippingFunctions");
 addpath("TrackerFiles");
@@ -29,13 +29,27 @@ Make a switch statement based on the behavior that the use desires?
 
 %}
 
+%% Asking user if they want to read from a .json
+% Change this so that it allows user to enter the name
+readFromJson = input("Do you want to read Data from a .mat named Data?", 's');
+if readFromJson == 'y'
+    clear Data
+    Data = load("Data.mat");
 
+end
 
 %% Only doing some functions if Data doesn't exist in the workspace
 
 if ~exist('Data', 'var')
     [Data, FullFileNames, AbrevFileNames] = makeNewDataStruct();
+    Data.FullFileNames = FullFileNames;
+    Data.AbrevFileNames = AbrevFileNames;
+else
+    FullFileNames = Data.FullFileNames;
+    AbrevFileNames = Data.AbrevFileNames;
+
 end
+
 
 %% Plotting the data so that you can see each stride
 
@@ -188,8 +202,8 @@ end
 
 %% Asking the user if they want to save these results
 
-save_answer = input("Want to save these results to a .json file? (y/n)", 's');
+save_answer = input("Want to save these results to a .mat file? (y/n)", 's');
 
 if save_answer == 'y'
-    writestruct(Data, 'Data.json');
+    save("Data.mat", '-struct', 'Data');
 end
