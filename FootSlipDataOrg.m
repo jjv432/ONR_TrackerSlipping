@@ -102,6 +102,7 @@ for i = 1:numel(FullFileNames)
         end
 
         TempData.(AbrevFileNames(i)) = TempFrequencyField;
+        TempData.(AbrevFileNames(i)).num_strides = (TempData.(AbrevFileNames(i)).num_strides- num_removal_answer - 1);
         Data = TempData;
     end
 
@@ -125,15 +126,16 @@ for i = 1:numel(FullFileNames)
     % represents x(t) for that stride
     x_tot = [];
     for k = 1:cur_num_strides
-        cur_x = Data.(AbrevFileNames(i)).(strcat("Stride_", num2str(k))).x;
+        cur_x = Data.(AbrevFileNames(i)).(strcat("Stride_", num2str(k))).x';
 
         % Horrible fix to this, but not sure how else to fix this issue
-        if (k == 4 && contains(FullFileNames(i), "0p5"))
-            cur_x = [cur_x; cur_x(end)];
-            
+        if numel(cur_x) < size(x_tot, 2)
+            cur_x = [cur_x, cur_x(end)];
         end
+      
+       
         % This works because we're assuming dt is constant
-        x_tot = [x_tot; cur_x'];
+        x_tot = [x_tot; cur_x];
 
     end
 
