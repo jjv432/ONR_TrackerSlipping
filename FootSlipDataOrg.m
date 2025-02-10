@@ -72,10 +72,13 @@ This function gets statistical data for all of the frequencies
 independently in the data struct.
 %}
 
-plotting_answer = input("Do you want to see the statistics for the trials (y/n)? ", 's');
+plotting_answer = input("Do you want to see the statistics for the trials (they will be updated regardless) (y/n)? ", 's');
 if plotting_answer == 'y'
-    Data = frequency_statistics(Data, FullFileNames, AbrevFileNames);
+    plotBool = 1;
+else
+    plotBool = 0;
 end
+Data = frequency_statistics(Data, FullFileNames, AbrevFileNames, plotBool);
 
 %% Asking the user if they want to save these results
 
@@ -84,3 +87,6 @@ save_answer = input("Want to save these results to a .mat file(y/n)? ", 's');
 if save_answer == 'y'
     save("Data.mat", '-struct', 'Data');
 end
+
+%% Cleaning up
+clc; clearvars -except Data
