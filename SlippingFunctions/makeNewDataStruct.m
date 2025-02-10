@@ -22,7 +22,7 @@ function [Data, FullFileNames, AbrevFileNames] = makeNewDataStruct()
         % Only 'ask' to pick a starting point if there isn't one saved yet
         if isempty(Data.(AbrevFileNames(i)).StartIndex)
             % call frame parser
-            StartIndex = frame_picker(Data.(AbrevFileNames(i)));
+            StartIndex = frame_picker(Data.(AbrevFileNames(i)), (AbrevFileNames(i)));
             Data.(AbrevFileNames(i)).StartIndex = StartIndex;
             close
         end
@@ -40,7 +40,7 @@ function [Data, FullFileNames, AbrevFileNames] = makeNewDataStruct()
         elseif contains(FullFileNames(i), "_4p0Hz")
             frequency = 4.0;
         elseif contains(FullFileNames(i), "_0p5Hz")
-            frequency = 0.5;
+            frequency = 0.5788; % using fft for orignal file
         end
         Data.(AbrevFileNames(i)).frequency = frequency;
 

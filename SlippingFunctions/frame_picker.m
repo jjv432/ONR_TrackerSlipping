@@ -1,4 +1,4 @@
-function Frames = frame_picker(plotting_data)
+function Frames = frame_picker(plotting_data, trial_name)
 
     % Referenced from: https://github.com/jjv432/ONR_Friction_Calcs/blob/main/frameParser.m
     fig = figure;
@@ -6,7 +6,7 @@ function Frames = frame_picker(plotting_data)
     plot(plotting_data.t, plotting_data.y)
     xlabel("Time (s)");
     ylabel("X-Position (x)");
-    title("X v T (Unverified)");
+    title("X v T for " + trial_name);
 
     datacursormode on
     dcm_obj = datacursormode(fig);

@@ -7,25 +7,18 @@ addpath("Figures");
 
 TO-DO
 
-Need to re-write this so that multiple trials of the same frequency can be
-used.  Can concatenate in the "Sorting each trial by stride based on time
-alone" section.  Also in this section, ensure correct number of plots are
-being made (comment is in there with more detail)
-
-Eventually, move sections to their own functions
-
 There's somthing about the 0p5 Hz trial that is causing stride 4 to have
 one less index than all of the other strides... curently have a not so
 great fix for it
 
-Add more helpful titles- base it off frequency/ file name
+!! Make the struct capable of holding multiple of the same frequency, then
+average between those !!
+- Make a 'field_combiner' function that goes through all of the fields,
+checks if the frequencies (and weight) are the same, then averages these
+together and stores it in a "mean_X_Hz" field
+- Can use the 'fields' function
 
-Combine functions where they don't need to be seperate.
-
-Add in a way to save the data struct- maybe don't call a few functions when
-data struct can be loaded instead
-
-Make a switch statement based on the behavior that the use desires?
+Go through with FFT function so that I can get the best frequency estimate
 
 %}
 

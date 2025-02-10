@@ -10,6 +10,7 @@ A trial exists BETWEEN two vertical lines.
         hold on
 
         plot(Data.(AbrevFileNames(i)).t, Data.(AbrevFileNames(i)).x);
+        title(AbrevFileNames(i));
         accumulated_time = Data.(AbrevFileNames(i)).t(Data.(AbrevFileNames(i)).StartIndex);
         xline(accumulated_time);
         for k = 1:Data.(AbrevFileNames(i)).num_strides

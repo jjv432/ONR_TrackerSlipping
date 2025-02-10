@@ -50,7 +50,7 @@ function Data = frequency_statistics(Data, FullFileNames, AbrevFileNames, plotBo
         Data.(AbrevFileNames(i)).std_x = std_x;
 
         % Always the same rang of time bc assuming dt's constant
-        cur_x_axis = Data.(AbrevFileNames(i)).(strcat("Stride_", num2str(k))).t';
+        cur_x_axis = linspace(0, Data.(AbrevFileNames(i)).frequency, numel(mean_x));
 
         if plotBool
             figure();
@@ -63,8 +63,9 @@ function Data = frequency_statistics(Data, FullFileNames, AbrevFileNames, plotBo
             xlabel("Time(s)");
             ylabel("Change in X-Position(m)");
             title(strcat("Normalized X-Position for ", num2str(Data.(AbrevFileNames(i)).frequency), "Hz"));
-            hold off
             ylim([-.1 .2]);
+            hold off
+            
             saveas(gcf, strcat("Figures/", num2str(Data.(AbrevFileNames(i)).frequency), '.fig'));
         end
 
