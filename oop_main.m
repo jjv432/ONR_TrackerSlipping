@@ -30,7 +30,13 @@ for i = numel(FullFileNames):-1:1
     clear cur_t
 end
 
+%%
+
 for i = numel(FullFileNames):-1:1
+    cur_t = t(i);
+
+    cur_t.GenerateStatistics
+    cur_t.PlotStatistics
 
 
 
