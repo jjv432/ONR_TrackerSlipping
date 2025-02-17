@@ -3,6 +3,7 @@ clc; clearvars -except t; close all; format compact
 %% Adding paths
 addpath("src");
 addpath("TrackerFiles");
+addpath("Figures");
 
 %% Determing File Names
 FileNames = string(ls("TrackerFiles"));
