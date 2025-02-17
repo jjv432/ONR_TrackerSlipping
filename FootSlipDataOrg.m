@@ -74,7 +74,6 @@ end
 Data = frequency_statistics(Data, FullFileNames, AbrevFileNames, plotBool);
 
 %% Asking the user if they want to save these results
-
 save_answer = input("Want to save these results to a .mat file(y/n)? ", 's');
 
 if save_answer == 'y'
