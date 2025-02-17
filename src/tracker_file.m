@@ -140,11 +140,9 @@ classdef tracker_file < handle
 
             clf;
             axs = gca;
-
-
             hold on
 
-            plot(axs, obj.t, obj.x);
+            plot(axs, obj.t, obj.y);
             title(obj.FileName);
 
             for k = 1:obj.StrideCount
@@ -195,7 +193,7 @@ classdef tracker_file < handle
                                 end
 
                                 obj.UpdateStridePositions
-                                if desired_stride == obj.StrideCount
+                                if desired_stride == 1
                                     obj.StartingIndex = newIndex;
                                 end
                                 obj.PlotStrides();
