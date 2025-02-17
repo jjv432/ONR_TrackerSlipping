@@ -1,4 +1,4 @@
-clc; clearvars -except t; close all; format compact
+clc; clearvars -except t starting_points; close all; format compact
 
 %% Adding paths
 addpath("SlippingFunctions");
@@ -25,7 +25,7 @@ for i = numel(FullFileNames):-1:1
 
     cur_t.PickStartingPoint
     cur_t.CreateStridePredicitons
-    cur_t.PlotStrides
+    % cur_t.PlotStrides
     % cur_t.AdjustStrides
     clear cur_t
 end

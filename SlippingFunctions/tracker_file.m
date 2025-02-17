@@ -20,6 +20,7 @@ classdef tracker_file < handle
         StrideTimeValues
         StrideCount
         Strides
+
     end
 
     methods
@@ -102,15 +103,21 @@ classdef tracker_file < handle
             %\cite{https://www.mathworks.com/matlabcentral/answers/152301-find-closest-value-in-array#comment_2806253}
             [~, t_vals_idx] = min(abs(obj.t - t_vals));
             obj.StrideTimeValues = t_vals;
+            obj.HSIndices = t_vals_idx;
 
-            num_strides_extra = numel(t_vals);
+            obj.UpdateStridePositions;
+
+        end
+
+        function UpdateStridePositions(obj)
+            num_strides_extra = numel(obj.StrideTimeValues);
             obj.StrideCount = num_strides_extra - 1;
 
             % Make sure not ending too soon, add end time?
             for k = 1:num_strides_extra -1
 
-                curX = obj.x(t_vals_idx(k):t_vals_idx(k+1));
-                curT = obj.t(t_vals_idx(k):t_vals_idx(k+1));
+                curX = obj.x(obj.HSIndices(k):obj.HSIndices(k+1));
+                curT = obj.t(obj.HSIndices(k):obj.HSIndices(k+1));
 
                 % Normalizing each stride
                 curX = curX - curX(1);
@@ -118,7 +125,7 @@ classdef tracker_file < handle
 
                 obj.Strides(k).x = curX;
                 obj.Strides(k).t = curT;
-                obj.Strides(k).Index = t_vals_idx(k);
+                obj.Strides(k).Indices = [obj.HSIndices(k),obj.HSIndices(k+1)];
 
             end
 
@@ -126,21 +133,19 @@ classdef tracker_file < handle
 
         function PlotStrides(obj)
 
+            clf;
             axs = gca;
-            cla
+
+
             hold on
 
             plot(axs, obj.t, obj.x);
             title(obj.FileName);
-            accumulated_time = obj.t(obj.StartingIndex);
-            xline(accumulated_time);
-            for k = obj.StrideCount:-1:1
 
-                cur_end_time = obj.Strides(k).t(end);
+            for k = 1:obj.StrideCount
 
-                xline(cur_end_time + accumulated_time);
-
-                accumulated_time = accumulated_time + cur_end_time;
+                xline(obj.t(obj.Strides(k).Indices(1)))
+                xline(obj.t(obj.Strides(k).Indices(2)))
 
             end
             hold off
@@ -157,14 +162,16 @@ classdef tracker_file < handle
 
             while(~doneBool)
 
-                desired_stride = input("Counting from RIGHT TO LEFT, which stride do you want to adjust?\n");
+                desired_stride = input("Counting from LEFT TO RIGHT, which line do you want to adjust?\n");
                 operation_type = input("Will this be deletion (d) or moving (m)?", 's');
+                
 
                 switch(operation_type)
                     case 'd'
                         obj.Strides(:, desired_stride) = [];
                         obj.StrideCount = obj.StrideCount - 1;
                     case 'm'
+                        fprintf("Use 'a' to move left, 's' to move right, 'x' to exit")
 
                         p = "";
                         while(p~='x')
@@ -176,20 +183,14 @@ classdef tracker_file < handle
 
                                 switch(p)
                                     case 'a'
-                                        newIndex= obj.Strides(desired_stride).Index - 1;
-
-                                    case 'd'
-                                        newIndex= obj.Strides(desired_stride).Index + 1;
-
+                                        obj.HSIndices(desired_stride)= obj.HSIndices(desired_stride) -1;
+     
+                                    case 's'
+                                        obj.HSIndices(desired_stride)= obj.HSIndices(desired_stride) + 1;
                                 end
 
-                                curIndex = obj.Strides(desired_stride).Index;
-
-                                obj.Strides(desired_stride).x = [obj.x(newIndex:curIndex); obj.Strides(desired_stride).x];
-                                obj.Strides(desired_stride).t = [obj.t(newIndex:curIndex); obj.Strides(desired_stride).t];
-                                obj.Strides(desired_stride).Index = newIndex;
-
-                                if desired_stride == 1
+                                obj.UpdateStridePositions
+                                if desired_stride == obj.StrideCount
                                     obj.StartingIndex = newIndex;
                                 end
                                 obj.PlotStrides();
