@@ -126,11 +126,11 @@ classdef tracker_file < handle
 
         function PlotStrides(obj)
 
-            close all
-            figure()
+            axs = gca;
+            cla
             hold on
 
-            plot(obj.t, obj.x);
+            plot(axs, obj.t, obj.x);
             title(obj.FileName);
             accumulated_time = obj.t(obj.StartingIndex);
             xline(accumulated_time);
@@ -159,41 +159,47 @@ classdef tracker_file < handle
 
                 desired_stride = input("Counting from RIGHT TO LEFT, which stride do you want to adjust?\n");
                 operation_type = input("Will this be deletion (d) or moving (m)?", 's');
-                pause();
 
                 switch(operation_type)
                     case 'd'
                         obj.Strides(:, desired_stride) = [];
                         obj.StrideCount = obj.StrideCount - 1;
                     case 'm'
-                        %\cite(https://www.mathworks.com/matlabcentral/answers/101415-how-to-get-input-from-user-without-asking-to-press-enter#answer_110763
-                        p = '';
 
-                        while p~= 'x'
-                            disp("In while loop");
-                            pause();
+                        p = "";
+                        while(p~='x')
                             w = waitforbuttonpress;
-
                             if w
-                                fprintf("W is 1");
                                 p = get(gcf, 'CurrentCharacter');
+                                p = string(p);
                                 disp(p);
 
                                 switch(p)
                                     case 'a'
-                                        obj.Strides(desired_stride).Index = obj.Strides(desired_stride).Index - 1;
+                                        newIndex= obj.Strides(desired_stride).Index - 1;
 
                                     case 'd'
-                                        obj.Strides(desired_stride).Index = obj.Strides(desired_stride).Index + 1;
+                                        newIndex= obj.Strides(desired_stride).Index + 1;
 
+                                end
+
+                                curIndex = obj.Strides(desired_stride).Index;
+
+                                obj.Strides(desired_stride).x = [obj.x(newIndex:curIndex); obj.Strides(desired_stride).x];
+                                obj.Strides(desired_stride).t = [obj.t(newIndex:curIndex); obj.Strides(desired_stride).t];
+                                obj.Strides(desired_stride).Index = newIndex;
+
+                                if desired_stride == 1
+                                    obj.StartingIndex = newIndex;
                                 end
                                 obj.PlotStrides();
                                 disp(p)
                             end
+
+
                         end
 
                 end
-                close
                 obj.PlotStrides();
 
                 doneBool = input("Are you done? (1/0)");
@@ -202,5 +208,6 @@ classdef tracker_file < handle
 
 
         end
+
     end
 end
