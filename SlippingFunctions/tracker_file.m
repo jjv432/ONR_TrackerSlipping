@@ -20,6 +20,11 @@ classdef tracker_file < handle
         StrideTimeValues
         StrideCount
         Strides
+        MeanXPosition
+        StdDevXPosition
+        MinXPosition
+        MaxXPosition
+        StatsPlottingTrialLength
 
     end
 
@@ -164,7 +169,7 @@ classdef tracker_file < handle
 
                 desired_stride = input("Counting from LEFT TO RIGHT, which line do you want to adjust?\n");
                 operation_type = input("Will this be deletion (d) or moving (m)?", 's');
-                
+
 
                 switch(operation_type)
                     case 'd'
@@ -184,7 +189,7 @@ classdef tracker_file < handle
                                 switch(p)
                                     case 'a'
                                         obj.HSIndices(desired_stride)= obj.HSIndices(desired_stride) -1;
-     
+
                                     case 's'
                                         obj.HSIndices(desired_stride)= obj.HSIndices(desired_stride) + 1;
                                 end
@@ -208,6 +213,45 @@ classdef tracker_file < handle
             end
 
 
+        end
+
+        function GenerateStatistics(obj)
+            ShortestTrialLength = inf;
+            for k = 1:obj.StrideCount
+                delta = obj.Strides(k).Indices(2) - obj.Strides(k).Indices(1);
+
+                if delta < ShortestTrialLength
+                    ShortestTrialLength = delta;
+                end
+
+            end
+            obj.StatsPlottingTrialLength = ShortestTrialLength;
+
+            x_matrix = [];
+            for k = obj.StrideCount:-1:1
+                x_matrix(:, k) = obj.Strides(k).x(1:ShortestTrialLength);
+
+            end
+
+            obj.MeanXPosition  = mean(x_matrix, 2);
+            obj.StdDevXPosition = std(x_matrix, [], 2);
+            obj.MaxXPosition = max(x_matrix, [], 2);
+            obj.MinXPosition = min(x_matrix, [], 2);
+
+        end
+        function PlotStatistics(obj)
+            figure();
+            hold on
+            fill([obj.t(1:obj.StatsPlottingTrialLength), flip(obj.t(1:obj.StatsPlottingTrialLength))], [(obj.MeanXPosition - obj.StdDevXPosition), flip(obj.MeanXPosition + obj.StdDevXPosition)], [0.8 0.8 0.8]); % \cite{https://www.mathworks.com/matlabcentral/answers/1928100-create-plot-with-shaded-standard-deviation-but#answer_1192320}
+            plot(obj.t(1:obj.StatsPlottingTrialLength), obj.MeanXPosition, '--k');
+            plot(obj.t(1:obj.StatsPlottingTrialLength), obj.MaxXPosition, '--b');
+            plot(obj.t(1:obj.StatsPlottingTrialLength), obj.MinXPosition, '--r');
+            legend('', "Mean", "Max", "Min");
+            xlabel("Time(s)");
+            ylabel("Change in X-Position(m)");
+
+            ylim([-.1 .2]);
+            hold off
         end
 
     end
