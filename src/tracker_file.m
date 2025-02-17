@@ -166,13 +166,14 @@ classdef tracker_file < handle
             while(~doneBool)
 
                 desired_stride = input("Counting from LEFT TO RIGHT, which line do you want to adjust?\n");
-                operation_type = input("Will this be deletion (d) or moving (m)?", 's');
+                operation_type = input("Will this be deletion (d) or moving (m) (MOVE FIRST)?", 's');
 
 
                 switch(operation_type)
                     case 'd'
-                        obj.Strides(:, desired_stride) = [];
-                        obj.StrideCount = obj.StrideCount - 1;
+
+                        obj.Strides(:, desired_stride:end) = [];
+                        obj.StrideCount = numel(obj.Strides);
                     case 'm'
                         fprintf("Use 'a' to move left, 's' to move right, 'x' to exit")
 
