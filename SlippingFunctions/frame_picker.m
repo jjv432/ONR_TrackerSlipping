@@ -11,7 +11,7 @@ function Frames = frame_picker(plotting_data, trial_name)
     datacursormode on
     dcm_obj = datacursormode(fig);
 
-    fprintf('Select beinning point of each trial, then the end of the last trial: \n');
+    fprintf('\nSelect beinning point of each trial, then the end of the last trial: \n');
     pause
     % Export cursor to workspace
     info_struct = getCursorInfo(dcm_obj);

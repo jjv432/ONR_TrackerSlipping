@@ -1,4 +1,4 @@
-classdef tracker_file
+classdef tracker_file < handle
     %UNTITLED2 Summary of this class goes here
     %   Detailed explanation goes here
 
@@ -15,6 +15,11 @@ classdef tracker_file
         a
         FileName
         NominalGaitFrequency
+        StartingIndex
+        HSIndices
+        StrideTimeValues
+        StrideCount
+        Strides
     end
 
     methods
@@ -62,10 +67,140 @@ classdef tracker_file
             end
         end
 
-        function outputArg = method1(obj,inputArg)
-            %METHOD1 Summary of this method goes here
-            %   Detailed explanation goes here
-            outputArg = obj.Property1 + inputArg;
+        function PickStartingPoint(obj)
+            % Referenced from: https://github.com/jjv432/ONR_Friction_Calcs/blob/main/frameParser.m
+            fig = figure;
+            fig.WindowState = "Maximized";
+            plot(obj.t, obj.y)
+            xlabel("Time (s)");
+            ylabel("X-Position (x)");
+            title("X v T for " + obj.FileName);
+
+            datacursormode on
+            dcm_obj = datacursormode(fig);
+
+            fprintf("Select beinning point of the data\n");
+            pause
+            % Export cursor to workspace
+            info_struct = getCursorInfo(dcm_obj);
+
+            %Putting variables in the order of trials
+            obj.StartingIndex = info_struct.DataIndex;
+
+            close
+        end
+
+        function CreateStridePredicitons(obj)
+
+
+            t_not = obj.t(obj.StartingIndex);
+            t_end = obj.t(end);
+            dt = 1/obj.NominalGaitFrequency;
+            t_vals = t_not:dt:t_end;
+
+
+            %\cite{https://www.mathworks.com/matlabcentral/answers/152301-find-closest-value-in-array#comment_2806253}
+            [~, t_vals_idx] = min(abs(obj.t - t_vals));
+            obj.StrideTimeValues = t_vals;
+
+            num_strides_extra = numel(t_vals);
+            obj.StrideCount = num_strides_extra - 1;
+
+            % Make sure not ending too soon, add end time?
+            for k = 1:num_strides_extra -1
+
+                curX = obj.x(t_vals_idx(k):t_vals_idx(k+1));
+                curT = obj.t(t_vals_idx(k):t_vals_idx(k+1));
+
+                % Normalizing each stride
+                curX = curX - curX(1);
+                curT = curT - curT(1);
+
+                obj.Strides(k).x = curX;
+                obj.Strides(k).t = curT;
+                obj.Strides(k).Index = t_vals_idx(k);
+
+            end
+
+        end
+
+        function PlotStrides(obj)
+
+            close all
+            figure()
+            hold on
+
+            plot(obj.t, obj.x);
+            title(obj.FileName);
+            accumulated_time = obj.t(obj.StartingIndex);
+            xline(accumulated_time);
+            for k = obj.StrideCount:-1:1
+
+                cur_end_time = obj.Strides(k).t(end);
+
+                xline(cur_end_time + accumulated_time);
+
+                accumulated_time = accumulated_time + cur_end_time;
+
+            end
+            hold off
+
+
+
+        end
+
+        function AdjustStrides(obj)
+
+            doneBool = 0;
+            close all
+            obj.PlotStrides();
+
+            while(~doneBool)
+
+                desired_stride = input("Counting from RIGHT TO LEFT, which stride do you want to adjust?\n");
+                operation_type = input("Will this be deletion (d) or moving (m)?", 's');
+                pause();
+
+                switch(operation_type)
+                    case 'd'
+                        obj.Strides(:, desired_stride) = [];
+                        obj.StrideCount = obj.StrideCount - 1;
+                    case 'm'
+                        %\cite(https://www.mathworks.com/matlabcentral/answers/101415-how-to-get-input-from-user-without-asking-to-press-enter#answer_110763
+                        p = '';
+
+                        while p~= 'x'
+                            disp("In while loop");
+                            pause();
+                            w = waitforbuttonpress;
+
+                            if w
+                                fprintf("W is 1");
+                                p = get(gcf, 'CurrentCharacter');
+                                disp(p);
+
+                                switch(p)
+                                    case 'a'
+                                        obj.Strides(desired_stride).Index = obj.Strides(desired_stride).Index - 1;
+
+                                    case 'd'
+                                        obj.Strides(desired_stride).Index = obj.Strides(desired_stride).Index + 1;
+
+                                end
+                                obj.PlotStrides();
+                                disp(p)
+                            end
+                        end
+
+                end
+                close
+                obj.PlotStrides();
+
+                doneBool = input("Are you done? (1/0)");
+
+            end
+
+
         end
     end
 end
