@@ -242,14 +242,14 @@ classdef tracker_file < handle
         function PlotStatistics(obj)
             figure();
             hold on
-            fill([obj.t(1:obj.StatsPlottingTrialLength), flip(obj.t(1:obj.StatsPlottingTrialLength))], [(obj.MeanXPosition - obj.StdDevXPosition), flip(obj.MeanXPosition + obj.StdDevXPosition)], [0.8 0.8 0.8]); % \cite{https://www.mathworks.com/matlabcentral/answers/1928100-create-plot-with-shaded-standard-deviation-but#answer_1192320}
+            fill([obj.t(1:obj.StatsPlottingTrialLength); flip(obj.t(1:obj.StatsPlottingTrialLength))], [(obj.MeanXPosition - obj.StdDevXPosition); flip(obj.MeanXPosition + obj.StdDevXPosition)], [0.8 0.8 0.8]); % \cite{https://www.mathworks.com/matlabcentral/answers/1928100-create-plot-with-shaded-standard-deviation-but#answer_1192320}
             plot(obj.t(1:obj.StatsPlottingTrialLength), obj.MeanXPosition, '--k');
             plot(obj.t(1:obj.StatsPlottingTrialLength), obj.MaxXPosition, '--b');
             plot(obj.t(1:obj.StatsPlottingTrialLength), obj.MinXPosition, '--r');
             legend('', "Mean", "Max", "Min");
             xlabel("Time(s)");
             ylabel("Change in X-Position(m)");
-
+            title(string(obj.FileName))
             ylim([-.1 .2]);
             hold off
         end

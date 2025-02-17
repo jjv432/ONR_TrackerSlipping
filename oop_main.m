@@ -1,7 +1,7 @@
-clc; clearvars -except t starting_points; close all; format compact
+clc; clearvars -except t; close all; format compact
 
 %% Adding paths
-addpath("SlippingFunctions");
+addpath("src");
 addpath("TrackerFiles");
 
 %% Determing File Names
@@ -30,16 +30,13 @@ for i = numel(FullFileNames):-1:1
     clear cur_t
 end
 
-%%
+%% Statistics
 
-for i = numel(FullFileNames):-1:1
+for i = 1:numel(FullFileNames)
     cur_t = t(i);
 
     cur_t.GenerateStatistics
     cur_t.PlotStatistics
-
-
-
 
 
 end
