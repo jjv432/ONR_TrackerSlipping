@@ -39,7 +39,18 @@ classdef tracker_file < handle
 
                 % Sort file into each column
 
-                if cur_col_size == 7
+                if cur_col_size == 3
+                    obj.t = temp(:, 1)- temp(1,1);
+                    obj.x = temp(:, 2)- temp(1,2);
+                    obj.y = temp(:, 3)- temp(1,3);
+
+                elseif cur_col_size == 4
+                    obj.t = temp(:, 1)- temp(1,1);
+                    obj.x = temp(:, 2)- temp(1,2);
+                    obj.y = temp(:, 3)- temp(1,3);
+                    obj.r = temp(:, 4);
+
+                elseif cur_col_size == 7
                     obj.t = temp(:, 1)- temp(1,1);
                     obj.x = temp(:, 2)- temp(1,2);
                     obj.y = temp(:, 3)- temp(1,3);
@@ -61,14 +72,23 @@ classdef tracker_file < handle
                     obj.a = temp(:, 10);
                 end
 
-                if contains(string(txtfile), "_1p0Hz")
-                    obj.NominalGaitFrequency = 1.0;
-                elseif contains(string(txtfile), "_2p5Hz")
-                    obj.NominalGaitFrequency = 2.5;
-                elseif contains(string(txtfile), "_4p0Hz")
-                    obj.NominalGaitFrequency = 4.0;
-                elseif contains(string(txtfile), "_0p5Hz")
+                if contains(string(txtfile), "0p5")
                     obj.NominalGaitFrequency = 0.5; % using fft for orignal file
+                elseif contains(string(txtfile), "1p0")
+                    obj.NominalGaitFrequency = 1.0;
+                elseif contains(string(txtfile), "1p25")
+                    obj.NominalGaitFrequency = 1.25;
+                elseif contains(string(txtfile), "1p5")
+                    obj.NominalGaitFrequency = 1.5;
+                elseif contains(string(txtfile), "1p75")
+                    obj.NominalGaitFrequency = 1.75;
+                elseif contains(string(txtfile), "2p0")
+                    obj.NominalGaitFrequency = 2.0;
+                elseif contains(string(txtfile), "2p5")
+                    obj.NominalGaitFrequency = 2.5;
+                elseif contains(string(txtfile), "4p0")
+                    obj.NominalGaitFrequency = 4.0;
+
                 end
 
             end
@@ -240,6 +260,7 @@ classdef tracker_file < handle
 
         end
         function PlotStatistics(obj)
+            obj.GenerateStatistics;
             f = figure();
             hold on
             fill([obj.t(1:obj.StatsPlottingTrialLength); flip(obj.t(1:obj.StatsPlottingTrialLength))], [(obj.MeanXPosition - obj.StdDevXPosition); flip(obj.MeanXPosition + obj.StdDevXPosition)], [0.8 0.8 0.8]); % \cite{https://www.mathworks.com/matlabcentral/answers/1928100-create-plot-with-shaded-standard-deviation-but#answer_1192320}
@@ -252,7 +273,7 @@ classdef tracker_file < handle
             title(string(obj.FileName))
             ylim([-.1 .2]);
             hold off
-            saveas(gcf, "Figures/" + erase(string(obj.FileName), ".txt"));
+            saveas(gcf, "Figures/" + erase(erase(string(obj.FileName), ".txt"), " "));
         end
 
     end
