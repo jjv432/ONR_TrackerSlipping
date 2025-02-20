@@ -24,12 +24,12 @@ AbrevFileNames = erase(FullFileNames, ["_", ".txt"]);
 %% Creating objects and loading data
 for i = numel(FullFileNames):-1:1
 
-
     t(i) = tracker_file(string(FullFileNames(i)));
     t(i).FileName = FullFileNames(i);
-
+    t(i).TitleName = AbrevFileNames(i);
 
 end
+
 
 %% Asking for Starting Point, Creating Strides
 
@@ -59,8 +59,3 @@ end
 % t(19).PlotStrides
 % t(19).AdjustStrides
 
-%% Temp
-
-for i = 1:numel(FullFileNames)
-    t(i).PlotStatistics
-end

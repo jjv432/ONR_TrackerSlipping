@@ -14,6 +14,7 @@ classdef tracker_file < handle
         ay
         a
         FileName
+        TitleName
         NominalGaitFrequency
         StartingIndex
         HSIndices
@@ -26,6 +27,9 @@ classdef tracker_file < handle
         MaxXPosition
         StatsPlottingTrialLength
         Figure
+        StanceRegionEndIndex
+        SlipRegionEndIndex
+        FlightBeginIndex
 
     end
 
@@ -100,8 +104,8 @@ classdef tracker_file < handle
             fig.WindowState = "Maximized";
             plot(obj.t, obj.y)
             xlabel("Time (s)");
-            ylabel("X-Position (x)");
-            title("X v T for " + obj.FileName);
+            ylabel("Y-Position (m)");
+            title("Y v T for " + obj.FileName);
 
             datacursormode on
             dcm_obj = datacursormode(fig);
@@ -261,20 +265,53 @@ classdef tracker_file < handle
         end
         function PlotStatistics(obj)
             obj.GenerateStatistics;
-            f = figure();
+            obj.CreateFlightPhasePrediction;
+            obj.Figure = figure();
             hold on
             fill([obj.t(1:obj.StatsPlottingTrialLength); flip(obj.t(1:obj.StatsPlottingTrialLength))], [(obj.MeanXPosition - obj.StdDevXPosition); flip(obj.MeanXPosition + obj.StdDevXPosition)], [0.8 0.8 0.8]); % \cite{https://www.mathworks.com/matlabcentral/answers/1928100-create-plot-with-shaded-standard-deviation-but#answer_1192320}
             plot(obj.t(1:obj.StatsPlottingTrialLength), obj.MeanXPosition, '--k');
             plot(obj.t(1:obj.StatsPlottingTrialLength), obj.MaxXPosition, '--b');
             plot(obj.t(1:obj.StatsPlottingTrialLength), obj.MinXPosition, '--r');
-            legend('', "Mean", "Max", "Min");
+            fill([obj.t(obj.FlightBeginIndex), obj.t(obj.StatsPlottingTrialLength), obj.t(obj.StatsPlottingTrialLength), obj.t(obj.FlightBeginIndex)], [100 100 -100 -100], [1 0.68 0.94], "FaceAlpha", .5);
+            legend("2\sigma", "Mean", "Max", "Min", "Flight Region", "Location", "northwest");
             xlabel("Time(s)");
             ylabel("Change in X-Position(m)");
-            title(string(obj.FileName))
+            title(string(obj.TitleName))
             ylim([-.1 .2]);
             hold off
             saveas(gcf, "Figures/" + erase(erase(string(obj.FileName), ".txt"), " "));
+
         end
 
+        function GenerateRegions(obj)
+
+            obj.PlotStatistics;
+            datacursormode on
+            stance_region_bool = input("Is there a stance region? (1/0)");
+            dcm_obj = datacursormode(obj.Figure);
+
+            if stance_region_bool
+                fprintf("Select ending point of the stance region, then the end of the slip region, then enter\n");
+                pause
+                % Export cursor to workspace
+                info_struct = getCursorInfo(dcm_obj);
+                [obj.StanceRegionEndIndex obj.SlipRegionEndIndex]= info_struct.DataIndex;
+            else
+                fprintf("Select ending point of the slip region, then enter\n");
+                pause
+                % Export cursor to workspace
+                info_struct = getCursorInfo(dcm_obj);
+                obj.StanceRegionEndIndex= [];
+                obj.SlipRegionEndIndex= info_struct.DataIndex(2);
+            end
+            close
+
+
+        end
+
+        function CreateFlightPhasePrediction(obj)
+            obj.FlightBeginIndex = ceil(obj.StatsPlottingTrialLength/2);
+            
+        end
     end
 end
