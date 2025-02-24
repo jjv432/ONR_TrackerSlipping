@@ -295,7 +295,7 @@ classdef tracker_file < handle
                 pause
                 % Export cursor to workspace
                 info_struct = getCursorInfo(dcm_obj);
-                [obj.StanceRegionEndIndex obj.SlipRegionEndIndex]= info_struct.DataIndex;
+                [obj.StanceRegionEndIndex, obj.SlipRegionEndIndex]= info_struct.DataIndex;
             else
                 fprintf("Select ending point of the slip region, then enter\n");
                 pause
@@ -311,7 +311,19 @@ classdef tracker_file < handle
 
         function CreateFlightPhasePrediction(obj)
             obj.FlightBeginIndex = ceil(obj.StatsPlottingTrialLength/2);
-            
+
         end
+
+        function save2jpg(obj)
+
+            obj.PlotStatistics;
+
+            openfig((erase((obj.FileName), {'.txt', ' '}) + '.fig'));
+            saveas(gcf, "Images/" + erase(obj.TitleName, ' ') + ".jpg");
+            close
+
+        end
+
     end
+
 end

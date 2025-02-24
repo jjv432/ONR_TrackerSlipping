@@ -1,4 +1,4 @@
-clc; clear; close all; format compact
+clc; close all; format compact
 
 addpath("Figures")
 addpath("Images")
