@@ -65,18 +65,18 @@ else
 end
 %% Adjusting the positions
 
-for i = 1:numel(FullFileNames)
-    t(i).PlotStrides
-    t(i).AdjustStrides
-    saveBool = 1;
-    if saveBool
-        save("T_Results.mat", 't');
-    end
-
-end
+% for i = 1:numel(FullFileNames)
+%     t(i).PlotStrides
+%     t(i).AdjustStrides
+%     saveBool = 1;
+%     if saveBool
+%         save("T_Results.mat", 't');
+%     end
+% 
+% end
 %% Saving the object
 
-for i = 1:numel(FullFileNames)
-    t(i).save2jpg;
-    close all
-end
+% for i = 1:numel(FullFileNames)
+%     t(i).save2jpg;
+%     close all
+% end

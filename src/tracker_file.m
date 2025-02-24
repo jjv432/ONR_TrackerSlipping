@@ -275,7 +275,7 @@ classdef tracker_file < handle
             fill([obj.t(obj.FlightBeginIndex), obj.t(obj.StatsPlottingTrialLength), obj.t(obj.StatsPlottingTrialLength), obj.t(obj.FlightBeginIndex)], [100 100 -100 -100], [1 0.68 0.94], "FaceAlpha", .5);
             legend("2\sigma", "Mean", "Max", "Min", "Flight Region", "Location", "northwest");
             xlabel("Time(s)");
-            ylabel("Change in X-Position(m)");
+            ylabel("X-Position(m)");
             title(string(obj.TitleName))
             ylim([-.1 .2]);
             hold off
