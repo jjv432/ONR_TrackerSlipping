@@ -27,6 +27,7 @@ classdef UnifiedFrictionModel < handle
             obj.PSOInfo.options = optimoptions('particleswarm', 'MaxIterations', 2, 'MaxTime', 2);
             obj.PSOInfo.nvars = 3;
             obj.SimulationInfo.init_traj = readmatrix("walk_test_2.txt");
+            obj.getParams();
         end
 
 
@@ -35,9 +36,8 @@ classdef UnifiedFrictionModel < handle
         %%%%%%%%%%%%%%%%%%          PSO Methods          %%%%%%%%%%%%%%%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         function RunPSO(obj)
-            obj.getParams;
-            obj.prepareODEParams;
-
+            
+            obj.prepareODEParams();
 
             [OptimizedState, FVAL] = particleswarm(@ModelSimulationCost, obj.PSOInfo.nvars, obj.PSOInfo.LB, obj.PSOInfo.UB, obj.PSOInfo.options);
 
@@ -73,25 +73,17 @@ classdef UnifiedFrictionModel < handle
             freeParams.kd_ang = (1/10)*freeParams.kp_ang;
             freeParams.mus = 1.3*freeParams.muk;
 
-            % Set event function
-            obj.ODEVariables.options = odeset('Events', @swim_event_func);
-
-            [t, q] = ode45(@(t, q) odefun_unifiedstance(t,q, obj.ODEVariables.traj, obj.SimulationInfo.freq, freeParams), obj.ODEVariables.tspan, obj.ODEVariables.q0, obj.ODEVariables.options);
-            % [t, q] = ode45(@(t, q) odefun_unifiedstance(t,q, obj.ODEVariables.traj, obj.SimulationInfo.freq, freeParams), obj.ODEVariables.tspan, obj.ODEVariables.q0);
+            [t, q] = ode45(@(t, q) odefun_unifiedstance(t,q,freeParams), obj.ODEVariables.tspan, obj.ODEVariables.q0, obj.ODEVariables.options);
 
             obj.ODEVariables.footPos = q(:,5);
             obj.ODEVariables.time = t;
 
-
-            %
-            % function [value,isterminal,direction] = swim_event_func()
-            %     value = obj.ODEVariables.Fnormal;
-            %     isterminal = 1;  % Stop integration when event occurs
-            %     direction = -1;  % Detect when Fn crosses zero from positive to negative
-            % end
         end
 
-        function [dq] = odefun_unifiedstance(t,q, traj, freq, freeParams)
+        function [dq] = odefun_unifiedstance(obj,t,q,freeParams)
+
+            traj = obj.ODEVariables.traj;
+            freq = obj.SimulationInfo.freq;
 
             l = q(1); dl = q(2);
             qB = q(3); dqB = q(4);
@@ -102,8 +94,7 @@ classdef UnifiedFrictionModel < handle
             muk = freeParams.muk;
             mus = freeParams.mus;
 
-
-            ldes = ldesFunc(t,traj,freq); % desired leg length
+            ldes = ldesFunc(t,obj.ODEVariables.traj,obj.SimulationInfo.freq); % desired leg length
             qBdes = qBdesFunc(t,traj,freq); % desired leg angle from horizontal
 
             dldes = dldesFunc(t,traj,freq); % desired rates
@@ -256,7 +247,7 @@ classdef UnifiedFrictionModel < handle
 
                 % Drag on leg - Integration
                 delta_s = 0.01;
-                bx_hat = cos(qB)*[1;0;0] + sin(qB)*[0;1;0];
+                bx_hat = cos(qB)*[1;0;0] + sin(qB)*[0;1;0]; % [cos(qBl); sin(qB); 0];
                 by_hat = -sin(qB)*[1;0;0] + cos(qB)*[0;1;0];
 
                 Fdrag = [0;0;0]; % drag force on leg
@@ -291,7 +282,6 @@ classdef UnifiedFrictionModel < handle
                 Torque_water_Bcm = Torque_water - cross(0.5*LB*bx_hat,Fdrag); % torque of water about cm of fin.
                 Fdrag_leg_x = Fdrag(1);
                 Fdrag_leg_y = Fdrag(2);
-                %keyboard()
                 Torque_water_Bcm_measure = Torque_water_Bcm(3);
 
                 vel_H = dl*bx_hat + l*dqB*by_hat + dx*[1;0;0]; % velocity of the hip
@@ -370,7 +360,15 @@ classdef UnifiedFrictionModel < handle
 
             obj.ODEVariables.q0 = [l0 dl0 qB0 dqB0 x0 dx0];
 
+            % Set event function
+            obj.ODEVariables.options = odeset('Events', @obj.swim_event_func);
 
+        end
+
+        function [value,isterminal,direction] = swim_event_func(obj)
+            value = obj.ODEVariables.Fnormal;
+            isterminal = 1;  % Stop integration when event occurs
+            direction = -1;  % Detect when Fn crosses zero from positive to negative
         end
 
 
