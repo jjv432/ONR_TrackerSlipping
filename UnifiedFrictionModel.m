@@ -96,7 +96,7 @@ classdef UnifiedFrictionModel < handle
             muk = freeParams.muk;
             mus = freeParams.mus;
 
-            ldes = obj.ldesFunc(t,obj.ODEVariables.traj,obj.SimulationInfo.freq); % desired leg length
+            ldes = obj.ldesFunc(t,traj,freq); % desired leg length
             qBdes = obj.qBdesFunc(t,traj,freq); % desired leg angle from horizontal
 
             dldes = obj.dldesFunc(t,traj,freq); % desired rates
@@ -145,14 +145,14 @@ classdef UnifiedFrictionModel < handle
                     d2l = ddq_aug_slide(1);
                     d2qB = ddq_aug_slide(2);
                     d2x = ddq_aug_slide(3);
-                    Fn = ddq_aug_slide(4);
+                    obj.ODEVariables.Fnormal = ddq_aug_slide(4);
 
 
                     footVel = dx;
-                    Ff = -muk*dx*abs(Fn)/(abs(dx) + obj.SimulationInfo.params.epsilonV);  % specified friction
+                    Ff = -muk*dx*abs(obj.ODEVariables.Fnormal)/(abs(dx) + obj.SimulationInfo.params.epsilonV);  % specified friction
 
 
-                    if ( ( abs(footVel) < obj.SimulationInfo.params.epsilonV ) && ( abs(Ff) < mus*abs(Fn) ) )
+                    if ( ( abs(footVel) < obj.SimulationInfo.params.epsilonV ) && ( abs(Ff) < mus*abs(obj.ODEVariables.Fnormal) ) )
                         isSliding = 0;
                     end
 
