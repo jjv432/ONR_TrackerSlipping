@@ -10,6 +10,7 @@ classdef UnifiedFrictionModel < handle
         OptimizedValues
         SimulationInfo
         ODEVariables
+        dataSpline
 
 
     end
@@ -48,9 +49,9 @@ classdef UnifiedFrictionModel < handle
                 obj.UnifiedModelLight(freeParams);
 
                 p = polyfit(obj.DataObject.t(1:obj.DataObject.StatsPlottingTrialLength), obj.DataObject.MeanXPosition, 9);
-                data_spline = polyval(p, obj.ODEVariables.time);
+                obj.dataSpline = polyval(p, obj.ODEVariables.time);
 
-                Cost = sum(abs((obj.ODEVariables.footPos - data_spline)));
+                Cost = sum(abs((obj.ODEVariables.footPos - obj.dataSpline)));
             end
         end
 

@@ -14,5 +14,5 @@ ufm.UnifiedModelLight(ufm.OptimizedValues.OptimizedState)
 
 figure()
 hold on
-plot(ufm.ODEVariables.time, ufm.ODEVariables.footPos)
+plot(ufm.ODEVariables.time, ufm.dataSpline, 'o')
 plot(ufm.DataObject.t(1:ufm.DataObject.StatsPlottingTrialLength), ufm.DataObject.MeanXPosition);
