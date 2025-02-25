@@ -7,15 +7,18 @@ addpath("ModelingFunctions\");
 
 load("T_Results.mat");
 
-global cur_x_vals
+global cur_x_vals cur_t_vals
 cur_x_vals = t(15).MeanXPosition;
+cur_t_vals = t(15).t(1:t(15).StatsPlottingTrialLength);
+cur_t_vals = cur_t_vals(1:t(15).FlightBeginIndex);
+cur_x_vals = cur_x_vals(1:t(15).FlightBeginIndex);
 
 %% Do PSO
 
 LB = [
     0 % finwidth
     0 % muK
-    0 %kp
+    30 %kp
 ];
 UB = [
     10
