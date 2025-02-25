@@ -14,5 +14,7 @@ ufm.UnifiedModelLight(ufm.OptimizedValues.OptimizedState)
 
 figure()
 hold on
-plot(ufm.ODEVariables.time, ufm.dataSpline, 'o')
+% Plot my best match to the data
+plot(ufm.ODEVariables.time, ufm.ODEVariables.footPos)
+% Plot the raw data
 plot(ufm.DataObject.t(1:ufm.DataObject.StatsPlottingTrialLength), ufm.DataObject.MeanXPosition);
