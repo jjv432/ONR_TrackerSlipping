@@ -15,8 +15,6 @@ function [footPos, time]= UnifiedModelLight(newFreeParams)
     global isSliding;
     isSliding = 0;
 
-
-
     g = params.g;
     mH = params.mH; % Hip mass
     mQ = params.mQ; % Foot mass

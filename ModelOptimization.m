@@ -26,9 +26,9 @@ UB = [
     75
 ];
 
-options = optimoptions('particleswarm', 'MaxIterations', 2);
+% options = optimoptions('particleswarm', 'MaxIterations', 2);
 nvars = 3;
-[x, FVAL] = particleswarm(@ModelSimulationCost,nvars, LB, UB, options);
+[x, FVAL] = particleswarm(@ModelSimulationCost,nvars, LB, UB);
 %%
 [footPos, time] = UnifiedModelLight(x);
 

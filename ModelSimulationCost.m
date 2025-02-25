@@ -9,10 +9,11 @@ function [Cost] = ModelSimulationCost(freeParams)
     persistent p 
     
     if isempty(p)
-        p = polyfit(cur_t_vals, cur_x_vals, 5);
+        p = polyfit(cur_t_vals, cur_x_vals, 9);
     end
 
-    data_spline = polyval(p, simulation_x_array);
+    % this is just making a straight line!
+    data_spline = polyval(p, simulation_time);
 
     Cost = sum((simulation_x_array - data_spline).^2);
 end
