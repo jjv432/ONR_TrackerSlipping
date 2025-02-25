@@ -11,8 +11,6 @@ classdef UnifiedFrictionModel < handle
         SimulationInfo
         ODEVariables
         dataSpline
-
-
     end
 
     methods
@@ -27,7 +25,7 @@ classdef UnifiedFrictionModel < handle
             obj.PSOInfo.options = optimoptions('particleswarm', 'MaxIterations', 2, 'MaxTime', 2);
             obj.PSOInfo.nvars = 3;
             obj.SimulationInfo.init_traj = readmatrix("walk_test_2.txt");
-            obj.getParams();
+            
         end
 
 
@@ -36,6 +34,7 @@ classdef UnifiedFrictionModel < handle
         %%%%%%%%%%%%%%%%%%          PSO Methods          %%%%%%%%%%%%%%%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         function RunPSO(obj)
+            obj.getParams();
             
             obj.prepareODEParams();
 
@@ -73,7 +72,7 @@ classdef UnifiedFrictionModel < handle
             freeParams.kd_ang = (1/10)*freeParams.kp_ang;
             freeParams.mus = 1.3*freeParams.muk;
 
-            [t, q] = ode45(@(t, q) odefun_unifiedstance(t,q,freeParams), obj.ODEVariables.tspan, obj.ODEVariables.q0, obj.ODEVariables.options);
+            [t, q] = ode45(@(t, q) odefun_unifiedstance(obj,t,q,freeParams), obj.ODEVariables.tspan, obj.ODEVariables.q0, obj.ODEVariables.options);
 
             obj.ODEVariables.footPos = q(:,5);
             obj.ODEVariables.time = t;
