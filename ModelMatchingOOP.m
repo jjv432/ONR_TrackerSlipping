@@ -1,7 +1,8 @@
 clc; clear; close all; format compact
 
 addpath("src");
-addpath("ModelingFunctions\");
+% addpath("autoSlide");
+% addpath("autoStick");
 
 load("T_Results.mat");
 

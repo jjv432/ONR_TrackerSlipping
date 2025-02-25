@@ -22,10 +22,11 @@ classdef UnifiedFrictionModel < handle
             obj.DataObject = DataObject;
             obj.PSOInfo.LB= [5 0 60];
             obj.PSOInfo.UB= [10 3 75];
-            obj.PSOInfo.options = optimoptions('particleswarm', 'MaxIterations', 2, 'MaxTime', 2);
+            obj.PSOInfo.options = optimoptions('particleswarm', 'MaxIterations', 200);
             obj.PSOInfo.nvars = 3;
             obj.SimulationInfo.init_traj = readmatrix("walk_test_2.txt");
-            
+            obj.ODEVariables.Fnormal = 1;
+
         end
 
 
@@ -35,15 +36,16 @@ classdef UnifiedFrictionModel < handle
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         function RunPSO(obj)
             obj.getParams();
-            
+
             obj.prepareODEParams();
 
-            [OptimizedState, FVAL] = particleswarm(@ModelSimulationCost, obj.PSOInfo.nvars, obj.PSOInfo.LB, obj.PSOInfo.UB, obj.PSOInfo.options);
+            % [OptimizedState, FVAL] = particleswarm(@ModelSimulationCost, obj.PSOInfo.nvars, obj.PSOInfo.LB, obj.PSOInfo.UB, obj.PSOInfo.options);
+            [OptimizedState, FVAL] = particleswarm(@ModelSimulationCost, obj.PSOInfo.nvars, obj.PSOInfo.LB, obj.PSOInfo.UB);
 
             obj.OptimizedValues.OptimizedState = OptimizedState;
             obj.OptimizedValues.FVAL = FVAL;
 
-
+            % Needs to be nested so that there's only one input
             function [Cost] = ModelSimulationCost(freeParams)
 
                 % Run the simulation to determine the range of x values
@@ -54,8 +56,8 @@ classdef UnifiedFrictionModel < handle
 
                 Cost = sum(abs((obj.ODEVariables.footPos - obj.dataSpline)));
             end
-        end
 
+        end
 
 
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -72,7 +74,8 @@ classdef UnifiedFrictionModel < handle
             freeParams.kd_ang = (1/10)*freeParams.kp_ang;
             freeParams.mus = 1.3*freeParams.muk;
 
-            [t, q] = ode45(@(t, q) odefun_unifiedstance(obj,t,q,freeParams), obj.ODEVariables.tspan, obj.ODEVariables.q0, obj.ODEVariables.options);
+            % [t, q] = ode45(@(t, q) obj.odefun_unifiedstance(t,q,freeParams), obj.ODEVariables.tspan, obj.ODEVariables.q0, obj.ODEVariables.options);
+            [t, q] = ode45(@(t, q) obj.odefun_unifiedstance(t,q,freeParams), obj.ODEVariables.tspan, obj.ODEVariables.q0);
 
             obj.ODEVariables.footPos = q(:,5);
             obj.ODEVariables.time = t;
@@ -93,17 +96,17 @@ classdef UnifiedFrictionModel < handle
             muk = freeParams.muk;
             mus = freeParams.mus;
 
-            ldes = ldesFunc(t,obj.ODEVariables.traj,obj.SimulationInfo.freq); % desired leg length
-            qBdes = qBdesFunc(t,traj,freq); % desired leg angle from horizontal
+            ldes = obj.ldesFunc(t,obj.ODEVariables.traj,obj.SimulationInfo.freq); % desired leg length
+            qBdes = obj.qBdesFunc(t,traj,freq); % desired leg angle from horizontal
 
-            dldes = dldesFunc(t,traj,freq); % desired rates
-            dqBdes = dqBdesFunc(t,traj,freq);
+            dldes = obj.dldesFunc(t,traj,freq); % desired rates
+            dqBdes = obj.dqBdesFunc(t,traj,freq);
 
             Tau = kp_ang * (qBdes - qB) +  kd_ang * (dqBdes - dqB);
 
             % Compute Fluid Forces (drag forces on hip h, drag forces on leg l, torque
             % due to water
-            [Fluid_forces, deltaLegDrags] = getFluidForcesUnified(q, freeParams);
+            [Fluid_forces, deltaLegDrags] = obj.getFluidForcesUnified(q, freeParams);
 
             % Apply switching logic
             isSliding = 0;
@@ -114,8 +117,8 @@ classdef UnifiedFrictionModel < handle
                     % Force of friction is unknown and d2x = 0
                     % Use stick dynamics
 
-                    Maug = M_aug_func_stick([l; qB]);
-                    fside = f_func_stick([l; qB; Tau; ldes],[dl; dqB],Fluid_forces);
+                    Maug = obj.M_aug_func_stick([l; qB]);
+                    fside = obj.f_func_stick([l; qB; Tau; ldes],[dl; dqB],Fluid_forces);
 
                     ddq_aug_stick = Maug^-1*fside; % [d2l d2qB Ff Fn]
 
@@ -124,9 +127,9 @@ classdef UnifiedFrictionModel < handle
                     d2x = 0; % forced to zero during sticktion
 
                     Ff = ddq_aug_stick(3); % friction (solved for)
-                    Fn = ddq_aug_stick(4); % normal
+                    obj.ODEVariables.Fnormal = ddq_aug_stick(4); % normal
 
-                    if(  abs(Ff) > mus*abs(Fn) )
+                    if(  abs(Ff) > mus*abs(obj.ODEVariables.Fnormal) )
                         isSliding = 1;
                     end
 
@@ -134,8 +137,8 @@ classdef UnifiedFrictionModel < handle
                 case 1      %sliding
                     % Force of friction is specified and d2x is unknown
                     % Use continuous friction
-                    Maug = M_aug_func_slide([l; qB],[dx],[muk]);
-                    fside = f_func_slide([l; qB; Tau; ldes],[dl; dqB],Fluid_forces);
+                    Maug = [l; qB],[dx],[muk];
+                    fside = obj.f_func_slide([l; qB; Tau; ldes],[dl; dqB],Fluid_forces);
 
                     ddq_aug_slide = Maug^-1*fside; % ddq_aug = [ddl ddqB ddx Fn];
 
@@ -157,145 +160,141 @@ classdef UnifiedFrictionModel < handle
 
             end
 
-            obj.ODEVariables.Fnormal = Fn;
-
             dq1 = dl; dq2 = d2l;
             dq3 = dqB; dq4 = d2qB;
             dq5 = dx;  dq6 = d2x;
 
             dq = [dq1; dq2; dq3; dq4; dq5; dq6];
 
+        end
 
-            function qBdes = qBdesFunc(t,traj,freq)
-                idx = ceil(t*length(traj(:,1))*freq);
-                if(idx==0)
-                    idx = 1;
-                end
-                xdes = traj(idx,1);
-                zdes = traj(idx,2);
-                qBdes = atan2(zdes,xdes) + pi;
+        function qBdes = qBdesFunc(obj,t,traj,freq)
+            idx = ceil(t*length(traj(:,1))*freq);
+            if(idx==0)
+                idx = 1;
+            end
+            xdes = traj(idx,1);
+            zdes = traj(idx,2);
+            qBdes = atan2(zdes,xdes) + pi;
+        end
+
+        function ldes = ldesFunc(obj, t,traj,freq)
+            idx = ceil(t*length(traj(:,1))*freq);
+            if(idx==0)
+                idx = 1;
+            end
+            xdes = traj(idx,1);
+            zdes = traj(idx,2);
+            ldes = sqrt(xdes^2+zdes^2);
+        end
+
+        function dqBdes = dqBdesFunc(obj,t,traj,freq)
+            idx = ceil(t*length(traj(:,1))*freq);
+            if(idx==0)
+                idx = 1;
+            end
+            xdes = traj(idx,1);
+            zdes = traj(idx,2);
+            qBdestemp = atan2(zdes,xdes);
+
+            xdes1 = traj(idx+1,1);
+            zdes1 = traj(idx+1,2);
+            qBdes1 = atan2(zdes1,xdes1);
+
+            dt = 1/freq/length(traj(:,1));
+            dqBdes = (qBdes1-qBdestemp)/dt;
+        end
+
+        function dldes = dldesFunc(obj,t,traj,freq)
+            idx = ceil(t*length(traj(:,1))*freq);
+            if(idx==0)
+                idx = 1;
+            end
+            xdes = traj(idx,1);
+            zdes = traj(idx,2);
+            ldes_temp = sqrt(xdes^2+zdes^2);
+
+            xdes1 = traj(idx+1,1);
+            zdes1 = traj(idx+1,2);
+            ldes1 = sqrt(xdes1^2+zdes1^2);
+
+            dt = 1/freq/length(traj(:,1));
+
+            dldes = (ldes1-ldes_temp)/dt;
+
+        end
+
+        function [Fluid_forces, deltaLegDrags] = getFluidForcesUnified(obj, q,freeParams)
+            l = q(1); dl = q(2);  % leg length and rate
+            qB = q(3); dqB = q(4); % leg angle and rate from ground
+            x = q(5); dx = q(6);   % foot position and vel
+
+
+            g = obj.SimulationInfo.params.g;
+            epsilonV = obj.SimulationInfo.params.epsilonV;
+            Cd_leg = obj.SimulationInfo.params.Cd_leg; % drag coefficient leg segment
+            Cd_hip = obj.SimulationInfo.params.Cd_hip;
+            LB = obj.SimulationInfo.params.finLen; % length of leg with fin
+            hB = obj.SimulationInfo.params.legWidth; % leg width
+            rho = obj.SimulationInfo.params.rho; % densitiy of water
+            R = obj.SimulationInfo.params.R;         % Radius of hip
+
+
+            wB = freeParams.finWidth; %m
+
+            Vol_hip = (4/3)*pi*R^3;
+
+            Fbuoy_hip_y = rho*Vol_hip*g;
+
+            % Drag on leg - Integration
+            delta_s = 0.01;
+            bx_hat = cos(qB)*[1;0;0] + sin(qB)*[0;1;0]; % [cos(qBl); sin(qB); 0];
+            by_hat = -sin(qB)*[1;0;0] + cos(qB)*[0;1;0];
+
+            Fdrag = [0;0;0]; % drag force on leg
+            Torque_water = [0;0;0]; % torque of drag force about foot;
+
+            ss_tmp = 0:delta_s:LB; %iterate over fin
+            numForces = numel(ss_tmp);
+            deltaLegDrags = zeros(numForces,3);
+            iter = 1;
+            for ss = 0:delta_s:LB % integrate over fin
+
+                %vel_p = [dx;0;0] + dqB*ss*by_hat;
+                vel_p = [dx;0;0] + dqB*ss*by_hat; % velocity of point p. Located at distance ss from the foot.
+                vel_hat = vel_p/norm(vel_p + obj.SimulationInfo.params.epsilonV); % unit vector along velocity at point p
+
+                lambda_hat = cross(vel_hat,[0;0;1]); % unit vector perpendicular to velocity of p
+
+                segment_len_projection = abs( dot(delta_s*bx_hat, lambda_hat) ) ; % length of projection of ds onto lamba
+
+                Frontal_area = segment_len_projection*wB;
+
+                Fdrag_segment = -0.5*rho*Cd_leg*Frontal_area*vel_p*norm(vel_p); % segment drag contribution.
+                TorqueDrag_segment = cross(ss*bx_hat,Fdrag_segment); % about foot
+
+                Fdrag = Fdrag + Fdrag_segment;
+                Torque_water = Torque_water + TorqueDrag_segment;
+
+                deltaLegDrags(iter,:) = [Fdrag_segment(1) Fdrag_segment(2) ss];
+                iter = iter + 1;
             end
 
-            function ldes = ldesFunc(t,traj,freq)
-                idx = ceil(t*length(traj(:,1))*freq);
-                if(idx==0)
-                    idx = 1;
-                end
-                xdes = traj(idx,1);
-                zdes = traj(idx,2);
-                ldes = sqrt(xdes^2+zdes^2);
-            end
+            Torque_water_Bcm = Torque_water - cross(0.5*LB*bx_hat,Fdrag); % torque of water about cm of fin.
+            Fdrag_leg_x = Fdrag(1);
+            Fdrag_leg_y = Fdrag(2);
+            Torque_water_Bcm_measure = Torque_water_Bcm(3);
 
-            function dqBdes = dqBdesFunc(t,traj,freq)
-                idx = ceil(t*length(traj(:,1))*freq);
-                if(idx==0)
-                    idx = 1;
-                end
-                xdes = traj(idx,1);
-                zdes = traj(idx,2);
-                qBdestemp = atan2(zdes,xdes);
+            vel_H = dl*bx_hat + l*dqB*by_hat + dx*[1;0;0]; % velocity of the hip
 
-                xdes1 = traj(idx+1,1);
-                zdes1 = traj(idx+1,2);
-                qBdes1 = atan2(zdes1,xdes1);
+            Fdrag_hip = -0.5*rho*pi*Cd_hip*R^2*vel_H*norm(vel_H);
 
-                dt = 1/freq/length(traj(:,1));
-                dqBdes = (qBdes1-qBdestemp)/dt;
-            end
+            Fdrag_hip_x = Fdrag_hip(1);
+            Fdrag_hip_y = Fdrag_hip(2);
 
-            function dldes = dldesFunc(t,traj,freq)
-                idx = ceil(t*length(traj(:,1))*freq);
-                if(idx==0)
-                    idx = 1;
-                end
-                xdes = traj(idx,1);
-                zdes = traj(idx,2);
-                ldes_temp = sqrt(xdes^2+zdes^2);
+            Fluid_forces = [Fdrag_hip_x; Fdrag_hip_y; Fdrag_leg_x; Fdrag_leg_y; Fbuoy_hip_y; Torque_water_Bcm_measure];
 
-                xdes1 = traj(idx+1,1);
-                zdes1 = traj(idx+1,2);
-                ldes1 = sqrt(xdes1^2+zdes1^2);
-
-                dt = 1/freq/length(traj(:,1));
-
-                dldes = (ldes1-ldes_temp)/dt;
-
-            end
-
-            function [Fluid_forces, deltaLegDrags] = getFluidForcesUnified(q,freeParams)
-                l = q(1); dl = q(2);  % leg length and rate
-                qB = q(3); dqB = q(4); % leg angle and rate from ground
-                x = q(5); dx = q(6);   % foot position and vel
-
-
-                g = obj.SimulationInfo.params.g;
-                epsilonV = obj.SimulationInfo.params.epsilonV;
-                Cd_leg = obj.SimulationInfo.params.Cd_leg; % drag coefficient leg segment
-                Cd_hip = obj.SimulationInfo.params.Cd_hip;
-                LB = obj.SimulationInfo.params.finLen; % length of leg with fin
-                hB = obj.SimulationInfo.params.legWidth; % leg width
-                rho = obj.SimulationInfo.params.rho; % densitiy of water
-                R = obj.SimulationInfo.params.R;         % Radius of hip
-
-
-                wB = freeParams.finWidth; %m
-
-                Vol_hip = (4/3)*pi*R^3;
-
-                Fbuoy_hip_y = rho*Vol_hip*g;
-
-                % Drag on leg - Integration
-                delta_s = 0.01;
-                bx_hat = cos(qB)*[1;0;0] + sin(qB)*[0;1;0]; % [cos(qBl); sin(qB); 0];
-                by_hat = -sin(qB)*[1;0;0] + cos(qB)*[0;1;0];
-
-                Fdrag = [0;0;0]; % drag force on leg
-                Torque_water = [0;0;0]; % torque of drag force about foot;
-
-                ss_tmp = 0:delta_s:LB; %iterate over fin
-                numForces = numel(ss_tmp);
-                deltaLegDrags = zeros(numForces,3);
-                iter = 1;
-                for ss = 0:delta_s:LB % integrate over fin
-
-                    %vel_p = [dx;0;0] + dqB*ss*by_hat;
-                    vel_p = [dx;0;0] + dqB*ss*by_hat; % velocity of point p. Located at distance ss from the foot.
-                    vel_hat = vel_p/norm(vel_p + obj.SimulationInfo.params.epsilonV); % unit vector along velocity at point p
-
-                    lambda_hat = cross(vel_hat,[0;0;1]); % unit vector perpendicular to velocity of p
-
-                    segment_len_projection = abs( dot(delta_s*bx_hat, lambda_hat) ) ; % length of projection of ds onto lamba
-
-                    Frontal_area = segment_len_projection*wB;
-
-                    Fdrag_segment = -0.5*rho*Cd_leg*Frontal_area*vel_p*norm(vel_p); % segment drag contribution.
-                    TorqueDrag_segment = cross(ss*bx_hat,Fdrag_segment); % about foot
-
-                    Fdrag = Fdrag + Fdrag_segment;
-                    Torque_water = Torque_water + TorqueDrag_segment;
-
-                    deltaLegDrags(iter,:) = [Fdrag_segment(1) Fdrag_segment(2) ss];
-                    iter = iter + 1;
-                end
-
-                Torque_water_Bcm = Torque_water - cross(0.5*LB*bx_hat,Fdrag); % torque of water about cm of fin.
-                Fdrag_leg_x = Fdrag(1);
-                Fdrag_leg_y = Fdrag(2);
-                Torque_water_Bcm_measure = Torque_water_Bcm(3);
-
-                vel_H = dl*bx_hat + l*dqB*by_hat + dx*[1;0;0]; % velocity of the hip
-
-                Fdrag_hip = -0.5*rho*pi*Cd_hip*R^2*vel_H*norm(vel_H);
-
-                Fdrag_hip_x = Fdrag_hip(1);
-                Fdrag_hip_y = Fdrag_hip(2);
-
-                Fluid_forces = [Fdrag_hip_x; Fdrag_hip_y; Fdrag_leg_x; Fdrag_leg_y; Fbuoy_hip_y; Torque_water_Bcm_measure];
-
-                %Fluid_forces = [0;0;0;0;Fbuoy_hip_y;0];
-            end
-
-
+            %Fluid_forces = [0;0;0;0;Fbuoy_hip_y;0];
         end
 
 
@@ -330,6 +329,92 @@ classdef UnifiedFrictionModel < handle
         end
 
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%%%%%%%%%%%%%%       Auto Functions          %%%%%%%%%%%%%%%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+        function Maug = M_aug_func_stick(obj, in1)
+            %M_aug_func_stick
+            %    Maug = M_aug_func_stick(IN1)
+
+            %    This function was generated by the Symbolic Math Toolbox version 23.2.
+            %    24-Feb-2025 14:50:14
+
+            l = in1(1,:);
+            qB = in1(2,:);
+            t2 = cos(qB);
+            t3 = sin(qB);
+            Maug = reshape([t2.*(9.4e+1./5.0),t3.*(9.4e+1./5.0),9.4e+1./5.0,0.0,l.*t3.*(-9.4e+1./5.0),l.*t2.*(9.4e+1./5.0),0.0,l.^2.*(9.4e+1./5.0),-1.0,0.0,0.0,0.0,0.0,-1.0,0.0,0.0],[4,4]);
+        end
+
+        function f = f_func_stick(obj, in1,in2,in3)
+            %F_FUNC_STICK
+            %    F = F_FUNC_STICK(IN1,IN2,IN3)
+
+            %    This function was generated by the Symbolic Math Toolbox version 23.2.
+            %    24-Feb-2025 14:50:14
+
+            Fbh_y = in3(5,:);
+            Fdh_x = in3(1,:);
+            Fdh_y = in3(2,:);
+            Fdl_x = in3(3,:);
+            Fdl_y = in3(4,:);
+            T_w = in3(6,:);
+            Tau = in1(3,:);
+            dl = in2(1,:);
+            dqB = in2(2,:);
+            l = in1(1,:);
+            ldes = in1(4,:);
+            qB = in1(2,:);
+            t2 = cos(qB);
+            t3 = sin(qB);
+            t4 = dqB.^2;
+            f = [Fdh_x+Fdl_x+dl.*dqB.*t3.*(1.88e+2./5.0)+l.*t2.*t4.*(9.4e+1./5.0);Fbh_y+Fdh_y+Fdl_y-dl.*dqB.*t2.*(1.88e+2./5.0)+l.*t3.*t4.*(9.4e+1./5.0)-1.8447324e+2;l.*-8.003e+3+ldes.*8.003e+3+t3.*(Fbh_y+Fdh_y+Fdl_y-1.8424e+2)+l.*t4.*(9.4e+1./5.0)+t2.*(Fdh_x+Fdl_x);T_w+Tau+l.*t2.*(Fbh_y+Fdh_y-1.8424e+2)-Fdh_x.*l.*t3-Fdl_x.*l.*t3.*5.0e-1+Fdl_y.*l.*t2.*5.0e-1-dl.*dqB.*l.*(1.88e+2./5.0)];
+        end
+
+
+        function f = f_func_slide(obj,in1,in2,in3)
+            %F_FUNC_SLIDE
+            %    F = F_FUNC_SLIDE(IN1,IN2,IN3)
+
+            %    This function was generated by the Symbolic Math Toolbox version 23.2.
+            %    24-Feb-2025 14:56:05
+
+            Fbh_y = in3(5,:);
+            Fdh_x = in3(1,:);
+            Fdh_y = in3(2,:);
+            Fdl_x = in3(3,:);
+            Fdl_y = in3(4,:);
+            T_w = in3(6,:);
+            Tau = in1(3,:);
+            dl = in2(1,:);
+            dqB = in2(2,:);
+            l = in1(1,:);
+            ldes = in1(4,:);
+            qB = in1(2,:);
+            t2 = cos(qB);
+            t3 = sin(qB);
+            t4 = dqB.^2;
+            f = [Fdh_x+Fdl_x+dl.*dqB.*t3.*(1.88e+2./5.0)+l.*t2.*t4.*(9.4e+1./5.0);Fbh_y+Fdh_y+Fdl_y-dl.*dqB.*t2.*(1.88e+2./5.0)+l.*t3.*t4.*(9.4e+1./5.0)-1.8447324e+2;l.*-8.003e+3+ldes.*8.003e+3+t3.*(Fbh_y+Fdh_y+Fdl_y-1.8424e+2)+l.*t4.*(9.4e+1./5.0)+t2.*(Fdh_x+Fdl_x);T_w+Tau+l.*t2.*(Fbh_y+Fdh_y-1.8424e+2)-Fdh_x.*l.*t3-Fdl_x.*l.*t3.*5.0e-1+Fdl_y.*l.*t2.*5.0e-1-dl.*dqB.*l.*(1.88e+2./5.0)];
+        end
+        function Maug = M_aug_func_slide(obj,in1,dx,muk)
+            %M_aug_func_slide
+            %    Maug = M_aug_func_slide(IN1,DX,MUK)
+
+            %    This function was generated by the Symbolic Math Toolbox version 23.2.
+            %    24-Feb-2025 14:56:04
+
+            l = in1(1,:);
+            qB = in1(2,:);
+            t2 = cos(qB);
+            t3 = sin(qB);
+            t4 = t2.*(9.4e+1./5.0);
+            t5 = l.*t3.*(9.4e+1./5.0);
+            t6 = -t5;
+            Maug = reshape([t4,t3.*(9.4e+1./5.0),9.4e+1./5.0,0.0,t6,l.*t4,0.0,l.^2.*(9.4e+1./5.0),1.88238e+1,0.0,t4,t6,(dx.*muk)./(abs(dx)+1.0e-5),-1.0,0.0,0.0],[4,4]);
+        end
+
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%%%%%%%%%%%%%%%%        ODE45 Params           %%%%%%%%%%%%%%%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -343,8 +428,8 @@ classdef UnifiedFrictionModel < handle
             obj.ODEVariables.traj = [x,z];
 
             % initial conditions
-            l0 = ldesFunc(0,obj.ODEVariables.traj,obj.SimulationInfo.freq);
-            qB0 = qBdesFunc(0,obj.ODEVariables.traj,obj.SimulationInfo.freq);
+            l0 = obj.ldesFunc(0,obj.ODEVariables.traj,obj.SimulationInfo.freq);
+            qB0 = obj.qBdesFunc(0,obj.ODEVariables.traj,obj.SimulationInfo.freq);
 
             M = [cos(qB0) -l0*sin(qB0); sin(qB0) l0*cos(qB0)];
             tmp = M\[obj.SimulationInfo.vx0_hip; obj.SimulationInfo.vy0_hip];
