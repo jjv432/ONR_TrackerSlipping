@@ -16,9 +16,9 @@ cur_x_vals = cur_x_vals(1:t(15).FlightBeginIndex);
 %% Do PSO
 
 LB = [
-    0 % finwidth
+    5 % finwidth
     0 % muK
-    30 %kp
+    60 %kp
 ];
 UB = [
     10
@@ -26,9 +26,9 @@ UB = [
     75
 ];
 
-% options = optimoptions('particleswarm', 'MaxIterations', 2);
+options = optimoptions('particleswarm', 'MaxIterations', 1);
 nvars = 3;
-[x, FVAL] = particleswarm(@ModelSimulationCost,nvars, LB, UB);
+[x, FVAL] = particleswarm(@ModelSimulationCost,nvars, LB, UB, options);
 %%
 [footPos, time] = UnifiedModelLight(x);
 
