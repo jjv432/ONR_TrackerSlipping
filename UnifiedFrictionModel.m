@@ -24,7 +24,7 @@ classdef UnifiedFrictionModel < handle
             obj.DataObject = DataObject;
             obj.PSOInfo.LB= [5 0 60];
             obj.PSOInfo.UB= [10 3 75];
-            obj.PSOInfo.options = optimoptions('particleswarm', 'MaxIterations', 100);
+            obj.PSOInfo.options = optimoptions('particleswarm', 'MaxIterations', 2, 'MaxTime', 2);
             obj.PSOInfo.nvars = 3;
             obj.SimulationInfo.init_traj = readmatrix("walk_test_2.txt");
         end
@@ -43,6 +43,8 @@ classdef UnifiedFrictionModel < handle
 
             obj.OptimizedValues.OptimizedState = OptimizedState;
             obj.OptimizedValues.FVAL = FVAL;
+
+
             function [Cost] = ModelSimulationCost(freeParams)
 
                 % Run the simulation to determine the range of x values
