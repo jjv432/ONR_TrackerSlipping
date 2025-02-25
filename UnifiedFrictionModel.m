@@ -75,7 +75,9 @@ classdef UnifiedFrictionModel < handle
             freeParams.mus = 1.3*freeParams.muk;
 
             % [t, q] = ode45(@(t, q) obj.odefun_unifiedstance(t,q,freeParams), obj.ODEVariables.tspan, obj.ODEVariables.q0, obj.ODEVariables.options);
-            [t, q] = ode45(@(t, q) obj.odefun_unifiedstance(t,q,freeParams), obj.ODEVariables.tspan, obj.ODEVariables.q0);
+            tspan = obj.ODEVariables.tspan;
+            q0 = obj.ODEVariables.q0;
+            [t, q] = ode45(@(t, q) obj.odefun_unifiedstance(t,q,freeParams), tspan, q0);
 
             obj.ODEVariables.footPos = q(:,5);
             obj.ODEVariables.time = t;
@@ -127,9 +129,9 @@ classdef UnifiedFrictionModel < handle
                     d2x = 0; % forced to zero during sticktion
 
                     Ff = ddq_aug_stick(3); % friction (solved for)
-                    obj.ODEVariables.Fnormal = ddq_aug_stick(4); % normal
+                    Fnormal = ddq_aug_stick(4); % normal
 
-                    if(  abs(Ff) > mus*abs(obj.ODEVariables.Fnormal) )
+                    if(  abs(Ff) > mus*abs(Fnormal) )
                         isSliding = 1;
                     end
 
@@ -145,14 +147,14 @@ classdef UnifiedFrictionModel < handle
                     d2l = ddq_aug_slide(1);
                     d2qB = ddq_aug_slide(2);
                     d2x = ddq_aug_slide(3);
-                    obj.ODEVariables.Fnormal = ddq_aug_slide(4);
+                    Fnormal = ddq_aug_slide(4);
 
 
                     footVel = dx;
                     Ff = -muk*dx*abs(obj.ODEVariables.Fnormal)/(abs(dx) + obj.SimulationInfo.params.epsilonV);  % specified friction
 
 
-                    if ( ( abs(footVel) < obj.SimulationInfo.params.epsilonV ) && ( abs(Ff) < mus*abs(obj.ODEVariables.Fnormal) ) )
+                    if ( ( abs(footVel) < obj.SimulationInfo.params.epsilonV ) && ( abs(Ff) < mus*abs(Fnormal) ) )
                         isSliding = 0;
                     end
 
@@ -166,9 +168,11 @@ classdef UnifiedFrictionModel < handle
 
             dq = [dq1; dq2; dq3; dq4; dq5; dq6];
 
+            obj.ODEVariables.Fnormal = Fnormal;
+
         end
 
-        function qBdes = qBdesFunc(obj,t,traj,freq)
+        function qBdes = qBdesFunc(obj, t,traj,freq)
             idx = ceil(t*length(traj(:,1))*freq);
             if(idx==0)
                 idx = 1;
@@ -333,7 +337,7 @@ classdef UnifiedFrictionModel < handle
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-        function Maug = M_aug_func_stick(obj, in1)
+        function Maug = M_aug_func_stick(obj,in1)
             %M_aug_func_stick
             %    Maug = M_aug_func_stick(IN1)
 
@@ -347,7 +351,7 @@ classdef UnifiedFrictionModel < handle
             Maug = reshape([t2.*(9.4e+1./5.0),t3.*(9.4e+1./5.0),9.4e+1./5.0,0.0,l.*t3.*(-9.4e+1./5.0),l.*t2.*(9.4e+1./5.0),0.0,l.^2.*(9.4e+1./5.0),-1.0,0.0,0.0,0.0,0.0,-1.0,0.0,0.0],[4,4]);
         end
 
-        function f = f_func_stick(obj, in1,in2,in3)
+        function f = f_func_stick(obj,in1,in2,in3)
             %F_FUNC_STICK
             %    F = F_FUNC_STICK(IN1,IN2,IN3)
 
@@ -397,6 +401,7 @@ classdef UnifiedFrictionModel < handle
             t4 = dqB.^2;
             f = [Fdh_x+Fdl_x+dl.*dqB.*t3.*(1.88e+2./5.0)+l.*t2.*t4.*(9.4e+1./5.0);Fbh_y+Fdh_y+Fdl_y-dl.*dqB.*t2.*(1.88e+2./5.0)+l.*t3.*t4.*(9.4e+1./5.0)-1.8447324e+2;l.*-8.003e+3+ldes.*8.003e+3+t3.*(Fbh_y+Fdh_y+Fdl_y-1.8424e+2)+l.*t4.*(9.4e+1./5.0)+t2.*(Fdh_x+Fdl_x);T_w+Tau+l.*t2.*(Fbh_y+Fdh_y-1.8424e+2)-Fdh_x.*l.*t3-Fdl_x.*l.*t3.*5.0e-1+Fdl_y.*l.*t2.*5.0e-1-dl.*dqB.*l.*(1.88e+2./5.0)];
         end
+
         function Maug = M_aug_func_slide(obj,in1,dx,muk)
             %M_aug_func_slide
             %    Maug = M_aug_func_slide(IN1,DX,MUK)
@@ -428,8 +433,10 @@ classdef UnifiedFrictionModel < handle
             obj.ODEVariables.traj = [x,z];
 
             % initial conditions
-            l0 = obj.ldesFunc(0,obj.ODEVariables.traj,obj.SimulationInfo.freq);
-            qB0 = obj.qBdesFunc(0,obj.ODEVariables.traj,obj.SimulationInfo.freq);
+            freq = obj.SimulationInfo.freq;
+            traj = obj.ODEVariables.traj;
+            l0 = obj.ldesFunc(0, traj, freq);
+            qB0 = obj.qBdesFunc(0, traj, freq);
 
             M = [cos(qB0) -l0*sin(qB0); sin(qB0) l0*cos(qB0)];
             tmp = M\[obj.SimulationInfo.vx0_hip; obj.SimulationInfo.vy0_hip];
