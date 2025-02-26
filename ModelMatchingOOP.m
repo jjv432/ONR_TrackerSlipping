@@ -1,9 +1,6 @@
 clc; clear; close all; format compact
 
 addpath("src");
-% addpath("autoSlide");
-% addpath("autoStick");
-
 load("T_Results.mat");
 
 
@@ -19,8 +16,3 @@ hold on
 plot(ufm.ODEVariables.time, ufm.ODEVariables.footPos)
 % Plot the raw data
 plot(ufm.DataObject.t(1:ufm.DataObject.StatsPlottingTrialLength), ufm.DataObject.MeanXPosition);
-
-
-%% 
-
-save("optimization_results.mat", 'ufm')
