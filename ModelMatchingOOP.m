@@ -5,6 +5,7 @@ load("T_Results.mat");
 
 
 ufm = UnifiedFrictionModel(t(15));
+ufm.UnifiedModelLight([.5 .5 .5])
 ufm.RunPSO;
 
 ufm.UnifiedModelLight(ufm.OptimizedValues.OptimizedState)
