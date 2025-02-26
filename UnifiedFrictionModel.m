@@ -39,8 +39,8 @@ classdef UnifiedFrictionModel < handle
 
             obj.prepareODEParams();
 
-            % [OptimizedState, FVAL] = particleswarm(@ModelSimulationCost, obj.PSOInfo.nvars, obj.PSOInfo.LB, obj.PSOInfo.UB, obj.PSOInfo.options);
-            [OptimizedState, FVAL] = particleswarm(@ModelSimulationCost, obj.PSOInfo.nvars, obj.PSOInfo.LB, obj.PSOInfo.UB);
+            [OptimizedState, FVAL] = particleswarm(@ModelSimulationCost, obj.PSOInfo.nvars, obj.PSOInfo.LB, obj.PSOInfo.UB, obj.PSOInfo.options);
+            % [OptimizedState, FVAL] = particleswarm(@ModelSimulationCost, obj.PSOInfo.nvars, obj.PSOInfo.LB, obj.PSOInfo.UB);
 
             obj.OptimizedValues.OptimizedState = OptimizedState;
             obj.OptimizedValues.FVAL = FVAL;
@@ -73,16 +73,28 @@ classdef UnifiedFrictionModel < handle
             freeParams.kp_ang = newFreeParams(3);
             freeParams.kd_ang = (1/10)*freeParams.kp_ang;
             freeParams.mus = 1.3*freeParams.muk;
+            odeOptions = odeset('Events', @swim_event_func); % DIFFERENT
 
-            % [t, q] = ode45(@(t, q) obj.odefun_unifiedstance(t,q,freeParams), obj.ODEVariables.tspan, obj.ODEVariables.q0, obj.ODEVariables.options);
+            % Don't need to do this reassignment
             tspan = obj.ODEVariables.tspan;
             q0 = obj.ODEVariables.q0;
-            [t, q] = ode45(@(t, q) obj.odefun_unifiedstance(t,q,freeParams), tspan, q0);
+            [t, q] = ode45(@(t, q) obj.odefun_unifiedstance(t,q,freeParams), tspan, q0, odeOptions);
 
             obj.ODEVariables.footPos = q(:,5);
             obj.ODEVariables.time = t;
 
+            % Set event function
+            function [value,isterminal,direction] = swim_event_func(obj)
+                value = obj.ODEVariables.Fnormal;
+                isterminal = 1;  % Stop integration when event occurs
+                direction = -1;  % Detect when Fn crosses zero from positive to negative
+            end
+
         end
+
+
+
+
 
         function [dq] = odefun_unifiedstance(obj,t,q,freeParams)
 
@@ -111,7 +123,7 @@ classdef UnifiedFrictionModel < handle
             [Fluid_forces, deltaLegDrags] = obj.getFluidForcesUnified(q, freeParams);
 
             % Apply switching logic
-            isSliding = 0;
+            isSliding = 1;
 
 
             switch(isSliding)
@@ -139,7 +151,8 @@ classdef UnifiedFrictionModel < handle
                 case 1      %sliding
                     % Force of friction is specified and d2x is unknown
                     % Use continuous friction
-                    Maug = [l; qB],[dx],[muk];
+                    disp("In case 1")
+                    Maug = obj.M_aug_func_slide([l; qB],[dx],[muk]);
                     fside = obj.f_func_slide([l; qB; Tau; ldes],[dl; dqB],Fluid_forces);
 
                     ddq_aug_slide = Maug^-1*fside; % ddq_aug = [ddl ddqB ddx Fn];
@@ -451,17 +464,9 @@ classdef UnifiedFrictionModel < handle
 
             obj.ODEVariables.q0 = [l0 dl0 qB0 dqB0 x0 dx0];
 
-            % Set event function
-            obj.ODEVariables.options = odeset('Events', @obj.swim_event_func);
+
+
 
         end
-
-        function [value,isterminal,direction] = swim_event_func(obj)
-            value = obj.ODEVariables.Fnormal;
-            isterminal = 1;  % Stop integration when event occurs
-            direction = -1;  % Detect when Fn crosses zero from positive to negative
-        end
-
-
     end
 end
