@@ -357,7 +357,8 @@ classdef UnifiedFrictionModel < handle
             % Should vary with frequency
 
             % getFluidForces params that don't change
-            obj.SimulationInfo.delta_s = 0.01;
+            % obj.SimulationInfo.delta_s = 0.01;
+            obj.SimulationInfo.delta_s = .05; % making much larger so sim doesnt take forever
             obj.SimulationInfo.Vol_hip = (4/3)*pi*obj.SimulationInfo.params.R^3;
             obj.SimulationInfo.ss_temp = 0:obj.SimulationInfo.delta_s:obj.SimulationInfo.params.finLen;
             obj.SimulationInfo.numForces = numel(obj.SimulationInfo.ss_temp);
@@ -389,10 +390,8 @@ classdef UnifiedFrictionModel < handle
             x0 = 0;
             dx0 = 0; % initial foot position and velocity
 
-
-            %% CHANGE THIS BACK!!!!
-            obj.ODEVariables.tspan = [0 obj.SimulationInfo.stance_duration];
-            obj.ODEVariables.tspan = [0 .05];
+            %% PUT THIS BACK! (remove the .04)
+            obj.ODEVariables.tspan = 0:.04:obj.SimulationInfo.stance_duration;
 
             obj.ODEVariables.q0 = [l0 dl0 qB0 dqB0 x0 dx0];
 
