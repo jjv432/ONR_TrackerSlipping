@@ -39,7 +39,7 @@ classdef UnifiedFrictionModel < handle
         %%%%%%%%%%%%%%%%%%          PSO Methods          %%%%%%%%%%%%%%%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         function RunPSO(obj)
-            
+
             p = polyfit(obj.DataObject.t(1:obj.DataObject.StatsPlottingTrialLength), obj.DataObject.MeanXPosition, 9);
 
 
@@ -85,18 +85,10 @@ classdef UnifiedFrictionModel < handle
 
         end
 
+
         function [dq] = odefun_unifiedstance(obj,t,q,freeParams)
-      
-            ldes = obj.ldesFunc(t); % desired leg length
-            qBdes = obj.qBdesFunc(t); % desobj.ODEVariables.trajired leg angle from horizontal
 
-            % dldes = obj.dldesFunc(t,traj,obj.SimulationInfo.freq); % desired rates
-            dqBdes = obj.dqBdesFunc(t);
-
-            Tau = freeParams.kp_ang * (qBdes - q(3)) +  freeParams.kd_ang * (dqBdes - q(4));
-
-            % Compute Fluid Forces (drag forces on hip h, drag forces on leg l, torque
-            % due to water
+            Tau = freeParams.kp_ang * (obj.qBdesFunc(t) - q(3)) +  freeParams.kd_ang * (obj.dqBdesFunc(t) - q(4));
 
             % Apply switching logic
             isSliding = 1;
@@ -108,14 +100,13 @@ classdef UnifiedFrictionModel < handle
                     % Use stick dynamics
 
                     Maug = obj.M_aug_func_stick([q(1); q(3)]);
-                    fside = obj.f_func_stick([q(1); q(3); Tau; ldes],[q(2); q(4)], obj.getFluidForcesUnified(q, freeParams));
+                    fside = obj.f_func_stick([q(1); q(3); Tau; obj.ldesFunc(t)],[q(2); q(4)], obj.getFluidForcesUnified(q, freeParams));
 
                     ddq_aug_stick = Maug^-1*fside; % [d2l d2qB Ff Fn]
 
-                    Ff = ddq_aug_stick(3); % friction (solved for)
                     obj.ODEVariables.Fnormal = ddq_aug_stick(4); % normal
 
-                    if(  abs(Ff) > freeParams.mus*abs(obj.ODEVariables.Fnormal) )
+                    if(  abs(ddq_aug_stick(3)) > freeParams.mus*abs(obj.ODEVariables.Fnormal) )
                         isSliding = 1;
                     end
 
@@ -126,20 +117,18 @@ classdef UnifiedFrictionModel < handle
                     % Force of friction is specified and d2x is unknown
                     % Use continuous friction
                     Maug = obj.M_aug_func_slide([q(1); q(3)],[q(6)],[freeParams.muk]);
-                    fside = obj.f_func_slide([q(1); q(3); Tau; ldes],[q(2); q(4)],obj.getFluidForcesUnified(q, freeParams));
+                    fside = obj.f_func_slide([q(1); q(3); Tau; obj.ldesFunc(t)],[q(2); q(4)],obj.getFluidForcesUnified(q, freeParams));
 
-                    ddq_aug_slide = Maug^-1*fside; % ddq_aug = [ddl ddqB ddx Fn];      
+                    ddq_aug_slide = Maug^-1*fside; % ddq_aug = [ddl ddqB ddx Fn];
 
-                    Ff = -freeParams.muk*q(6)*abs(ddq_aug_slide(4))/(abs(q(6)) + obj.SimulationInfo.params.epsilonV);  % specified friction
-
-                    if ( ( abs(q(6)) < obj.SimulationInfo.params.epsilonV ) && ( abs(Ff) < freeParams.mus*abs(ddq_aug_slide(4)) ) )
+                    if ( ( abs(q(6)) < obj.SimulationInfo.params.epsilonV ) && ( abs(-freeParams.muk*q(6)*abs(ddq_aug_slide(4))/(abs(q(6)) + obj.SimulationInfo.params.epsilonV)) < freeParams.mus*abs(ddq_aug_slide(4)) ) )
                         isSliding = 0;
                     end
 
                     dq = [q(2); ddq_aug_slide(1); q(4); ddq_aug_slide(2); q(6); ddq_aug_slide(3)];
                     obj.ODEVariables.Fnormal = ddq_aug_slide(4);
 
-            end          
+            end
 
         end
 
@@ -306,7 +295,7 @@ classdef UnifiedFrictionModel < handle
 
                 % obj.SimulationInfo.deltaDrags(iter,:) = [Fdrag_segment(1) Fdrag_segment(2) sst];
                 % iter = iter + 1;
-                
+
             end
 
             Torque_water_Bcm = Torque_water - cross(0.5*obj.SimulationInfo.params.finLen*[cos(q(3));sin(q(3));0],Fdrag); % torque of water about cm of fin.
