@@ -30,7 +30,7 @@ classdef UnifiedFrictionModel < handle
             obj.getParams;
             obj.prepareODEParams;
             % Set event function
-            obj.ODEVariables.options = odeset('MinStep', 1e-7, 'Events', @swim_event_func);
+            obj.ODEVariables.options = odeset('MinStep', 1e-7, 'AbsTol', 1e-5,'Events', @swim_event_func);
         end
 
 
