@@ -23,14 +23,14 @@ classdef UnifiedFrictionModel < handle
         function obj = UnifiedFrictionModel(DataObject)
             obj.DataObject = DataObject;
             obj.PSOInfo.LB= [0 0 0];
-            obj.PSOInfo.UB= [1 1 1];
-            obj.PSOInfo.options = optimoptions('particleswarm', 'MaxIterations', 2, 'MaxTime', 2);
+            obj.PSOInfo.UB= [10 10 10];
+            obj.PSOInfo.options = optimoptions('particleswarm', 'MaxIterations', 2, 'MaxTime', 2, 'MinNeighborsFraction',1, 'SwarmSize', 60, 'FunctionTolerance', 1);
             obj.PSOInfo.nvars = 3;
             obj.SimulationInfo.init_traj = readmatrix("walk_test_2.txt");
             obj.getParams;
             obj.prepareODEParams;
             % Set event function
-            obj.ODEVariables.options = odeset('MinStep', 1e-7, 'AbsTol', 1e-5, 'RelTol', 5e-2, 'Events', @swim_event_func);
+            obj.ODEVariables.options = odeset('MinStep', 1e-7, 'AbsTol', 1e-5, 'RelTol', 1e-3, 'Events', @swim_event_func);
         end
 
 
@@ -90,45 +90,57 @@ classdef UnifiedFrictionModel < handle
 
             Tau = freeParams.kp_ang * (obj.qBdesFunc(t) - q(3)) +  freeParams.kd_ang * (obj.dqBdesFunc(t) - q(4));
 
-            % Apply switching logic
-            isSliding = 1;
+            % % Apply switching logic
+            % isSliding = 1;
+            %
+            %
+            % switch(isSliding)
+            %     case 0      % sticking
+            %         % Force of friction is unknown and d2x = 0
+            %         % Use stick dynamics
+            %
+            %         Maug = obj.M_aug_func_stick([q(1); q(3)]);
+            %         fside = obj.f_func_stick([q(1); q(3); Tau; obj.ldesFunc(t)],[q(2); q(4)], obj.getFluidForcesUnified(q, freeParams));
+            %
+            %         ddq_aug_stick = Maug^-1*fside; % [d2l d2qB Ff Fn]
+            %
+            %         obj.ODEVariables.Fnormal = ddq_aug_stick(4); % normal
+            %
+            %         if(  abs(ddq_aug_stick(3)) > freeParams.mus*abs(obj.ODEVariables.Fnormal) )
+            %             isSliding = 1;
+            %         end
+            %
+            %         dq = [q(2); ddq_aug_stick(1); q(4); ddq_aug_stick(2); q(6); 0];
+            %
+            %
+            %     case 1      %sliding
+            %         % Force of friction is specified and d2x is unknown
+            %         % Use continuous friction
+            %         Maug = obj.M_aug_func_slide([q(1); q(3)],[q(6)],[freeParams.muk]);
+            %         fside = obj.f_func_slide([q(1); q(3); Tau; obj.ldesFunc(t)],[q(2); q(4)],obj.getFluidForcesUnified(q, freeParams));
+            %
+            %         ddq_aug_slide = Maug^-1*fside; % ddq_aug = [ddl ddqB ddx Fn];
+            %
+            %         if ( ( abs(q(6)) < obj.SimulationInfo.params.epsilonV ) && ( abs(-freeParams.muk*q(6)*abs(ddq_aug_slide(4))/(abs(q(6)) + obj.SimulationInfo.params.epsilonV)) < freeParams.mus*abs(ddq_aug_slide(4)) ) )
+            %             isSliding = 0;
+            %         end
+            %
+            %         dq = [q(2); ddq_aug_slide(1); q(4); ddq_aug_slide(2); q(6); ddq_aug_slide(3)];
+            %         obj.ODEVariables.Fnormal = ddq_aug_slide(4);
+            %
+            % end
 
+            Maug = obj.M_aug_func_slide([q(1); q(3)],[q(6)],[freeParams.muk]);
+            fside = obj.f_func_slide([q(1); q(3); Tau; obj.ldesFunc(t)],[q(2); q(4)],obj.getFluidForcesUnified(q, freeParams));
 
-            switch(isSliding)
-                case 0      % sticking
-                    % Force of friction is unknown and d2x = 0
-                    % Use stick dynamics
+            ddq_aug_slide = Maug^-1*fside; % ddq_aug = [ddl ddqB ddx Fn];
 
-                    Maug = obj.M_aug_func_stick([q(1); q(3)]);
-                    fside = obj.f_func_stick([q(1); q(3); Tau; obj.ldesFunc(t)],[q(2); q(4)], obj.getFluidForcesUnified(q, freeParams));
-
-                    ddq_aug_stick = Maug^-1*fside; % [d2l d2qB Ff Fn]
-
-                    obj.ODEVariables.Fnormal = ddq_aug_stick(4); % normal
-
-                    if(  abs(ddq_aug_stick(3)) > freeParams.mus*abs(obj.ODEVariables.Fnormal) )
-                        isSliding = 1;
-                    end
-
-                    dq = [q(2); ddq_aug_stick(1); q(4); ddq_aug_stick(2); q(6); 0];
-
-
-                case 1      %sliding
-                    % Force of friction is specified and d2x is unknown
-                    % Use continuous friction
-                    Maug = obj.M_aug_func_slide([q(1); q(3)],[q(6)],[freeParams.muk]);
-                    fside = obj.f_func_slide([q(1); q(3); Tau; obj.ldesFunc(t)],[q(2); q(4)],obj.getFluidForcesUnified(q, freeParams));
-
-                    ddq_aug_slide = Maug^-1*fside; % ddq_aug = [ddl ddqB ddx Fn];
-
-                    if ( ( abs(q(6)) < obj.SimulationInfo.params.epsilonV ) && ( abs(-freeParams.muk*q(6)*abs(ddq_aug_slide(4))/(abs(q(6)) + obj.SimulationInfo.params.epsilonV)) < freeParams.mus*abs(ddq_aug_slide(4)) ) )
-                        isSliding = 0;
-                    end
-
-                    dq = [q(2); ddq_aug_slide(1); q(4); ddq_aug_slide(2); q(6); ddq_aug_slide(3)];
-                    obj.ODEVariables.Fnormal = ddq_aug_slide(4);
-
+            if ( ( abs(q(6)) < obj.SimulationInfo.params.epsilonV ) && ( abs(-freeParams.muk*q(6)*abs(ddq_aug_slide(4))/(abs(q(6)) + obj.SimulationInfo.params.epsilonV)) < freeParams.mus*abs(ddq_aug_slide(4)) ) )
+                isSliding = 0;
             end
+
+            dq = [q(2); ddq_aug_slide(1); q(4); ddq_aug_slide(2); q(6); ddq_aug_slide(3)];
+            obj.ODEVariables.Fnormal = ddq_aug_slide(4);
 
         end
 
