@@ -1,12 +1,13 @@
 clc; clear; close all; format compact
 
 addpath("src");
+addpath("UnifiedFrictionModelstandaloneApplication\");
 load("T_Results.mat");
 
-
-ufm = UnifiedFrictionModel(t(15));
-ufm.UnifiedModelLight([.5 .5 .5])
-ufm.RunPSO;
+UnifiedFrictionModel t(15)
+% ufm = UnifiedFrictionModel(t(15));
+% ufm.UnifiedModelLight([.5 .5 .5])
+ans.RunPSO;
 
 ufm.UnifiedModelLight(ufm.OptimizedValues.OptimizedState)
 %%

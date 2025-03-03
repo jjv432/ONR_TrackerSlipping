@@ -24,7 +24,7 @@ classdef UnifiedFrictionModel < handle
             obj.DataObject = DataObject;
             obj.PSOInfo.LB= [0 0 0];
             obj.PSOInfo.UB= [10 10 10];
-            obj.PSOInfo.options = optimoptions('particleswarm', 'MaxIterations', 2, 'MaxTime', 2, 'MinNeighborsFraction',1, 'SwarmSize', 60, 'FunctionTolerance', 1);
+            obj.PSOInfo.options = optimoptions('particleswarm', 'MaxIterations', 2, 'MaxTime', 2, 'MinNeighborsFraction',1, 'SwarmSize', 20, 'FunctionTolerance', 1, 'MaxStallTime', 2);
             obj.PSOInfo.nvars = 3;
             obj.SimulationInfo.init_traj = readmatrix("walk_test_2.txt");
             obj.getParams;
