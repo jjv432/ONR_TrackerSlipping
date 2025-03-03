@@ -1,7 +1,10 @@
 clc; clear; close all; format compact
 
 addpath("src");
+<<<<<<< HEAD
 addpath("UnifiedFrictionModelstandaloneApplication\");
+=======
+>>>>>>> 8bbe898ddba0c6974765793b9e75117fe79b324a
 load("T_Results.mat");
 
 UnifiedFrictionModel t(15)

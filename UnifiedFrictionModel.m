@@ -22,6 +22,7 @@ classdef UnifiedFrictionModel < handle
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         function obj = UnifiedFrictionModel(DataObject)
             obj.DataObject = DataObject;
+<<<<<<< HEAD
             obj.PSOInfo.LB= [0 0 0];
             obj.PSOInfo.UB= [10 10 10];
             obj.PSOInfo.options = optimoptions('particleswarm', 'MaxIterations', 2, 'MaxTime', 2, 'MinNeighborsFraction',1, 'SwarmSize', 20, 'FunctionTolerance', 1, 'MaxStallTime', 2);
@@ -31,6 +32,13 @@ classdef UnifiedFrictionModel < handle
             obj.prepareODEParams;
             % Set event function
             obj.ODEVariables.options = odeset('MinStep', 1e-7, 'AbsTol', 1e-4, 'RelTol', 1e-3, 'Events', @swim_event_func);
+=======
+            obj.PSOInfo.LB= [5 0 60];
+            obj.PSOInfo.UB= [10 3 75];
+            obj.PSOInfo.options = optimoptions('particleswarm', 'MaxIterations', 2, 'MaxTime', 2);
+            obj.PSOInfo.nvars = 3;
+            obj.SimulationInfo.init_traj = readmatrix("walk_test_2.txt");
+>>>>>>> 8bbe898ddba0c6974765793b9e75117fe79b324a
         end
 
 
@@ -39,12 +47,20 @@ classdef UnifiedFrictionModel < handle
         %%%%%%%%%%%%%%%%%%          PSO Methods          %%%%%%%%%%%%%%%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         function RunPSO(obj)
+<<<<<<< HEAD
 
             p = polyfit(obj.DataObject.t(1:obj.DataObject.StatsPlottingTrialLength), obj.DataObject.MeanXPosition, 9);
 
 
             [OptimizedState, FVAL] = particleswarm(@ModelSimulationCost, obj.PSOInfo.nvars, obj.PSOInfo.LB, obj.PSOInfo.UB, obj.PSOInfo.options);
             % [OptimizedState, FVAL] = particleswarm(@ModelSimulationCost, obj.PSOInfo.nvars, obj.PSOInfo.LB, obj.PSOInfo.UB);
+=======
+            obj.getParams;
+            obj.prepareODEParams;
+
+
+            [OptimizedState, FVAL] = particleswarm(@ModelSimulationCost, obj.PSOInfo.nvars, obj.PSOInfo.LB, obj.PSOInfo.UB, obj.PSOInfo.options);
+>>>>>>> 8bbe898ddba0c6974765793b9e75117fe79b324a
 
             obj.OptimizedValues.OptimizedState = OptimizedState;
             obj.OptimizedValues.FVAL = FVAL;
@@ -77,14 +93,29 @@ classdef UnifiedFrictionModel < handle
             freeParams.kd_ang = (1/10)*freeParams.kp_ang;
             freeParams.mus = 1.3*freeParams.muk;
 
+<<<<<<< HEAD
             [t, q] = ode45(@(t, q) obj.odefun_unifiedstance(t,q, freeParams), obj.ODEVariables.tspan, obj.ODEVariables.q0, obj.ODEVariables.options);
+=======
+            % Set event function
+            obj.ODEVariables.options = odeset('Events', @swim_event_func);
+
+            [t, q] = ode45(@(t, q) odefun_unifiedstance(t,q, obj.ODEVariables.traj, obj.SimulationInfo.freq, freeParams), obj.ODEVariables.tspan, obj.ODEVariables.q0, obj.ODEVariables.options);
+>>>>>>> 8bbe898ddba0c6974765793b9e75117fe79b324a
             % [t, q] = ode45(@(t, q) odefun_unifiedstance(t,q, obj.ODEVariables.traj, obj.SimulationInfo.freq, freeParams), obj.ODEVariables.tspan, obj.ODEVariables.q0);
 
             obj.ODEVariables.footPos = q(:,5);
             obj.ODEVariables.time = t;
 
+
+            %
+            % function [value,isterminal,direction] = swim_event_func()
+            %     value = obj.ODEVariables.Fnormal;
+            %     isterminal = 1;  % Stop integration when event occurs
+            %     direction = -1;  % Detect when Fn crosses zero from positive to negative
+            % end
         end
 
+<<<<<<< HEAD
 
         function [dq] = odefun_unifiedstance(obj,t,q,freeParams)
 
@@ -129,6 +160,79 @@ classdef UnifiedFrictionModel < handle
             %         obj.ODEVariables.Fnormal = ddq_aug_slide(4);
             %
             % end
+=======
+        function [dq] = odefun_unifiedstance(t,q, traj, freq, freeParams)
+
+            l = q(1); dl = q(2);
+            qB = q(3); dqB = q(4);
+            x = q(5); dx = q(6);
+
+            kp_ang = freeParams.kp_ang; % controller gains for applied torque on leg
+            kd_ang = freeParams.kd_ang;
+            muk = freeParams.muk;
+            mus = freeParams.mus;
+
+
+            ldes = ldesFunc(t,traj,freq); % desired leg length
+            qBdes = qBdesFunc(t,traj,freq); % desired leg angle from horizontal
+
+            dldes = dldesFunc(t,traj,freq); % desired rates
+            dqBdes = dqBdesFunc(t,traj,freq);
+
+            Tau = kp_ang * (qBdes - qB) +  kd_ang * (dqBdes - dqB);
+
+            % Compute Fluid Forces (drag forces on hip h, drag forces on leg l, torque
+            % due to water
+            [Fluid_forces, deltaLegDrags] = getFluidForcesUnified(q, freeParams);
+
+            % Apply switching logic
+            isSliding = 0;
+
+
+            switch(isSliding)
+                case 0      % sticking
+                    % Force of friction is unknown and d2x = 0
+                    % Use stick dynamics
+
+                    Maug = M_aug_func_stick([l; qB]);
+                    fside = f_func_stick([l; qB; Tau; ldes],[dl; dqB],Fluid_forces);
+
+                    ddq_aug_stick = Maug^-1*fside; % [d2l d2qB Ff Fn]
+
+                    d2l = ddq_aug_stick(1);
+                    d2qB = ddq_aug_stick(2);
+                    d2x = 0; % forced to zero during sticktion
+
+                    Ff = ddq_aug_stick(3); % friction (solved for)
+                    Fn = ddq_aug_stick(4); % normal
+
+                    if(  abs(Ff) > mus*abs(Fn) )
+                        isSliding = 1;
+                    end
+
+
+                case 1      %sliding
+                    % Force of friction is specified and d2x is unknown
+                    % Use continuous friction
+                    Maug = M_aug_func_slide([l; qB],[dx],[muk]);
+                    fside = f_func_slide([l; qB; Tau; ldes],[dl; dqB],Fluid_forces);
+
+                    ddq_aug_slide = Maug^-1*fside; % ddq_aug = [ddl ddqB ddx Fn];
+
+                    d2l = ddq_aug_slide(1);
+                    d2qB = ddq_aug_slide(2);
+                    d2x = ddq_aug_slide(3);
+                    Fn = ddq_aug_slide(4);
+
+
+                    footVel = dx;
+                    Ff = -muk*dx*abs(Fn)/(abs(dx) + obj.SimulationInfo.params.epsilonV);  % specified friction
+
+
+                    if ( ( abs(footVel) < obj.SimulationInfo.params.epsilonV ) && ( abs(Ff) < mus*abs(Fn) ) )
+                        isSliding = 0;
+                    end
+>>>>>>> 8bbe898ddba0c6974765793b9e75117fe79b324a
 
             Maug = obj.M_aug_func_slide([q(1); q(3)],[q(6)],[freeParams.muk]);
             fside = obj.f_func_slide([q(1); q(3); Tau; obj.ldesFunc(t)],[q(2); q(4)],obj.getFluidForcesUnified(q, freeParams));
@@ -139,6 +243,7 @@ classdef UnifiedFrictionModel < handle
                 isSliding = 0;
             end
 
+<<<<<<< HEAD
             dq = [q(2); ddq_aug_slide(1); q(4); ddq_aug_slide(2); q(6); ddq_aug_slide(3)];
             obj.ODEVariables.Fnormal = ddq_aug_slide(4);
 
@@ -227,6 +332,23 @@ classdef UnifiedFrictionModel < handle
 
         function qBdes = qBdesFunc(obj,t)
             idx = ceil(t*length(obj.ODEVariables.traj(:,1))*obj.SimulationInfo.freq);
+=======
+            obj.ODEVariables.Fnormal = Fn;
+
+            dq1 = dl; dq2 = d2l;
+            dq3 = dqB; dq4 = d2qB;
+            dq5 = dx;  dq6 = d2x;
+
+            dq = [dq1; dq2; dq3; dq4; dq5; dq6];
+
+
+
+
+        end
+
+        function qBdes = qBdesFunc(obj,t,traj,freq)
+            idx = ceil(t*length(traj(:,1))*freq);
+>>>>>>> 8bbe898ddba0c6974765793b9e75117fe79b324a
             if(idx==0)
                 idx = 1;
             end
@@ -235,8 +357,13 @@ classdef UnifiedFrictionModel < handle
             qBdes = atan2(zdes,xdes) + pi;
         end
 
+<<<<<<< HEAD
         function ldes = ldesFunc(obj,t)
             idx = ceil(t*length(obj.ODEVariables.traj(:,1))*obj.SimulationInfo.freq);
+=======
+        function ldes = ldesFunc(obj,t,traj,freq)
+            idx = ceil(t*length(traj(:,1))*freq);
+>>>>>>> 8bbe898ddba0c6974765793b9e75117fe79b324a
             if(idx==0)
                 idx = 1;
             end
@@ -262,8 +389,13 @@ classdef UnifiedFrictionModel < handle
             dqBdes = (qBdes1-qBdestemp)/dt;
         end
 
+<<<<<<< HEAD
         function dldes = dldesFunc(obj,t)
             idx = ceil(t*length(obj.ODEVariables.traj(:,1))*obj.SimulationInfo.freq);
+=======
+        function dldes = dldesFunc(t,traj,freq)
+            idx = ceil(t*length(traj(:,1))*freq);
+>>>>>>> 8bbe898ddba0c6974765793b9e75117fe79b324a
             if(idx==0)
                 idx = 1;
             end
@@ -284,6 +416,13 @@ classdef UnifiedFrictionModel < handle
         function [Fluid_forces] = getFluidForcesUnified(obj, q,freeParams)
 
             % Drag on leg - Integration
+<<<<<<< HEAD
+=======
+            delta_s = 0.01;
+            bx_hat = cos(qB)*[1;0;0] + sin(qB)*[0;1;0];
+            by_hat = -sin(qB)*[1;0;0] + cos(qB)*[0;1;0];
+
+>>>>>>> 8bbe898ddba0c6974765793b9e75117fe79b324a
             Fdrag = [0;0;0]; % drag force on leg
             Torque_water = [0;0;0]; % torque of drag force about foot;
 
@@ -310,7 +449,15 @@ classdef UnifiedFrictionModel < handle
 
             end
 
+<<<<<<< HEAD
             Torque_water_Bcm = Torque_water - cross(0.5*obj.SimulationInfo.params.finLen*[cos(q(3));sin(q(3));0],Fdrag); % torque of water about cm of fin.
+=======
+            Torque_water_Bcm = Torque_water - cross(0.5*LB*bx_hat,Fdrag); % torque of water about cm of fin.
+            Fdrag_leg_x = Fdrag(1);
+            Fdrag_leg_y = Fdrag(2);
+            %keyboard()
+            Torque_water_Bcm_measure = Torque_water_Bcm(3);
+>>>>>>> 8bbe898ddba0c6974765793b9e75117fe79b324a
 
             vel_H = q(2)*[cos(q(3));sin(q(3));0] + q(1)*q(4)*[-sin(q(3)); cos(q(3));0] + q(6)*[1;0;0]; % velocity of the hip
 
@@ -350,6 +497,7 @@ classdef UnifiedFrictionModel < handle
             obj.SimulationInfo.vy0_hip = -0.0; % initial velocity of hip at stance m/s.
             % Should vary with frequency
 
+<<<<<<< HEAD
             % getFluidForces params that don't change
             % obj.SimulationInfo.delta_s = 0.01;
             obj.SimulationInfo.delta_s = .05; % making much larger so sim doesnt take forever
@@ -359,6 +507,8 @@ classdef UnifiedFrictionModel < handle
             obj.SimulationInfo.deltaDrags = zeros(obj.SimulationInfo.numForces,3);
         end
 
+=======
+>>>>>>> 8bbe898ddba0c6974765793b9e75117fe79b324a
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%%%%%%%%%%%%%%%%        ODE45 Params           %%%%%%%%%%%%%%%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -373,8 +523,13 @@ classdef UnifiedFrictionModel < handle
             obj.ODEVariables.traj = [x,z];
 
             % initial conditions
+<<<<<<< HEAD
             l0 = obj.ldesFunc(0);
             qB0 = obj.qBdesFunc(0);
+=======
+            l0 = ldesFunc(0,obj.ODEVariables.traj,obj.SimulationInfo.freq);
+            qB0 = qBdesFunc(0,obj.ODEVariables.traj,obj.SimulationInfo.freq);
+>>>>>>> 8bbe898ddba0c6974765793b9e75117fe79b324a
 
             M = [cos(qB0) -l0*sin(qB0); sin(qB0) l0*cos(qB0)];
             tmp = M\[obj.SimulationInfo.vx0_hip; obj.SimulationInfo.vy0_hip];
