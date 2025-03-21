@@ -1,38 +1,27 @@
-% Camilo Ordonez - 2025
-% EDITED: Jack Vranicar - 2025
+clc; clear; close all; format compact
+% parpool
 
-%% Formatting
-clc
-clear
-close all
 
-addpath("ModelFunctionsFiles");
-addpath("ModelFunctionsFiles\autoSlide\")
-addpath("ModelFunctionsFiles\autoStick\")
+global isSliding
+isSliding = 0;
 
-%% Loading trajectory
-traj = readmatrix("walk_test_2.txt");
-
-%% Loading and organizing data from experiment
 load("T_Results.mat");
+
+
+obj = getParams();
+
 t_results = t(15);
 cur_t_vals = t_results.t(1:t_results.StatsPlottingTrialLength);
 cur_x_vals = t_results.MeanXPosition(1:t_results.StatsPlottingTrialLength);
 
 p = polyfit(cur_t_vals, cur_x_vals, 13);
 
-%% Setting parameters
-params = jv_getParams();
 
+% initial conditions
+l0 = ldesFunc(0, obj);
+qB0 = qBdesFunc(0, obj);
 
-global isSliding;
-isSliding = 0;
-
-g = params.SimulationInfo.params.g;
-mH = params.SimulationInfo.params.mH; % Hip mass
-mQ = params.SimulationInfo.params.mQ; % Foot mass
-k = params.SimulationInfo.params.k;   % leg stifness (N/m)
-epsilonV = params.SimulationInfo.params.epsilonV;
+% Should vary with frequency
 
 %% Run PSO
 
@@ -40,25 +29,26 @@ costFunctionHandle = @(freeParams) ModelSimulationCost(freeParams, obj, p);
 
 disp("Starting PSO...");
 psoTimer = tic;
-[OptimizedState, FVAL] = particleswarm(costFunctionHandle, params.PSOInfo.nvars, params.PSOInfo.LB, params.PSOInfo.UB, params.PSOInfo.options);
+[OptimizedState, FVAL] = particleswarm(costFunctionHandle, obj.PSOInfo.nvars, obj.PSOInfo.LB, obj.PSOInfo.UB, obj.PSOInfo.options);
 fprintf("\n\nPSO Completed in %.3f seconds", toc(psoTimer));
 
 disp(OptimizedState);
 
-[footPos, time] = UnifiedModelLight(OptimizedState, params);
+[footPos, time] = UnifiedModelLight(OptimizedState, obj);
 
 figure
 hold on
 plot(time, footPos, 'xr');
 plot(cur_t_vals, cur_x_vals, 'k');
 legend("Best Simulation", "Experimental Data");
-%% Creating a cost function for PSO
-function [Cost] = ModelSimulationCost(freeParams, params, p)
+%%
+
+function [Cost] = ModelSimulationCost(freeParams, obj, p)
 
     timerVal = tic;
     fprintf("Starting a Simulation...");
     % Run the simulation to determine the range of x values
-    [simulation_x_array, simulation_time, warning] = UnifiedModelLight(freeParams, params);
+    [simulation_x_array, simulation_time, warning] = UnifiedModelLight(freeParams, obj);
 
 
     if warning
@@ -76,7 +66,7 @@ function [Cost] = ModelSimulationCost(freeParams, params, p)
 
 end
 
-function [footPos, time, isWarning]= UnifiedModelLight(newFreeParams, params)
+function [footPos, time, isWarning]= UnifiedModelLight(newFreeParams, obj)
     global Fn
     Fn = 1;
     %
@@ -89,8 +79,6 @@ function [footPos, time, isWarning]= UnifiedModelLight(newFreeParams, params)
     freeParams.kp_ang = newFreeParams(3);
     freeParams.kd_ang = newFreeParams(4);
     freeParams.mus = newFreeParams(5);
-    params.SimulationInfo.params.Cd_hip = newFreeParams(6);
-    params.SimulationInfo.params.Cd_leg = newFreeParams(7);
 
 
     % freeParams.kd_ang = 0.1*newFreeParams(3);
@@ -101,12 +89,12 @@ function [footPos, time, isWarning]= UnifiedModelLight(newFreeParams, params)
 
     tstart = tic;
 
-    originalWarningState = warning('query', 'MATLAB:ode15s:IntegrationTolNotMet');
+    originalWarningState = warning('query', 'MATLAB:ode23s:IntegrationTolNotMet');
 
     % Convert the specific warning to an error
-    warning('error', 'MATLAB:ode15s:IntegrationTolNotMet');
+    warning('error', 'MATLAB:ode23s:IntegrationTolNotMet');
     try
-        [t, q] = ode15s(@(t, q) jv_odefun_unifiedstance(t,q, freeParams, params), params.ODEVariables.tspan, params.ODEVariables.q0, odeset('Events', @(t, q) swim_event_func(t, q, tstart, Fn)));
+        [t, q] = ode23s(@(t, q) odefun_unifiedstance(t,q, freeParams, obj), obj.ODEVariables.tspan, obj.ODEVariables.q0, odeset('Events', @(t, q) swim_event_func(t, q, tstart, Fn)));
         footPos = q(:,5);
         time = t;
         isWarning = 0;
@@ -119,199 +107,216 @@ function [footPos, time, isWarning]= UnifiedModelLight(newFreeParams, params)
 
     end
 
-    warning(originalWarningState.state, 'MATLAB:ode15s:IntegrationTolNotMet');
+    warning(originalWarningState.state, 'MATLAB:ode23s:IntegrationTolNotMet');
 
 end
-%%
-freq = 2.5; %Hz
-stance_duration = 0.16;
-vx0_hip = 0.2; vy0_hip = 0.0; % initial velocity of hip at stance m/s.
-% Should vary with frequency
 
+function [dq] = odefun_unifiedstance(t,q,freeParams, obj)
 
-%% Free Params used for Model Tunning
-freeParams.kp_ang = 73; % controller gains for applied torque on leg
-freeParams.kd_ang = freeParams.kp_ang/10;
-freeParams.muk = 1.0;
-freeParams.mus = 1.5;
-freeParams.finWidth = 8.18/100; %m
+    global Fn
+    global isSliding
 
-%% Trajectory sent to the robot
-x = traj(1:500,5);
-z = traj(1:500,7);
+    l = q(1); dl = q(2);
+    qB = q(3); dqB = q(4);
+    x = q(5); dx = q(6);
 
-figure(1)
+    try
+        ldes = ldesFunc(t,traj,freq); % desired leg length
+        qBdes = qBdesFunc(t,traj,freq); % desired leg angle from horizontal
 
-plot(x,z,'o')
-hold on
-plot(x(1),z(1),'or')
+        dldes = dldesFunc(t,traj,freq); % desired rates
+        dqBdes = dqBdesFunc(t,traj,freq);
 
-traj = [x,z];
+        Tau = freeParams.kp_ang * (qBdes - q(3)) +  freeParams.kd_ang * (dqBdes - q(4));
+
+        % Compute Fluid Forces (drag forces on hip h, drag forces on leg l, torque
+        % due to water
+        [Fluid_forces] = getFluidForcesUnified(q, freeParams, obj);
 
 
 
+        %% Apply switching logic
+        % isSliding = 1;
+        switch(isSliding)
+            case 0      % sticking
+                % Force of friction is unknown and d2x = 0
+                % Use stick dynamics
 
-for tt = 0:0.001:stance_duration
+                Maug = M_aug_func_stick([l; qB]);
+                fside = f_func_stick([l; qB; Tau; ldes],[dl; dqB],Fluid_forces);
 
-    idx = ceil(tt*length(traj(:,1))*freq);
+                ddq_aug_stick = Maug^-1*fside; % [d2l d2qB Ff Fn]
+
+                d2l = ddq_aug_stick(1);
+                d2qB = ddq_aug_stick(2);
+                d2x = 0; % forced to zero during sticktion
+
+                Ff = ddq_aug_stick(3); % friction (solved for)
+                Fn = ddq_aug_stick(4); % normal
+
+                if(  abs(Ff) > freeParams.mus*abs(Fn) )
+                    isSliding = 1;
+                end
+
+
+                % if(  abs(Ff) > realmax ) % inifinite friction
+                %     isSliding = 1;
+                % end
+
+
+            case 1      %sliding
+                % Force of friction is specified and d2x is unknown
+                % Use continuous friction
+                Maug = M_aug_func_slide([l; qB],[dx],[freeParams.muk]);
+                fside = f_func_slide([l; qB; Tau; ldes],[dl; dqB],Fluid_forces);
+
+                ddq_aug_slide = Maug^-1*fside; % ddq_aug = [ddl ddqB ddx Fn];
+
+                d2l = ddq_aug_slide(1);
+                d2qB = ddq_aug_slide(2);
+                d2x = ddq_aug_slide(3);
+                Fn = ddq_aug_slide(4);
+
+
+                footVel = dx;
+                Ff = -freeParams.muk*dx*abs(Fn)/(abs(dx) + obj.SimulationInfo.params.epsilonV);  % specified friction
+
+
+                if ( ( abs(footVel) < obj.SimulationInfo.params.epsilonV ) && ( abs(Ff) < freeParams.mus*abs(Fn) ) )
+                    isSliding = 0;
+                end
+
+
+
+        end
+
+        Fnormal = Fn
+
+        dq1 = dl; dq2 = d2l;
+        dq3 = dqB; dq4 = d2qB;
+        dq5 = dx;  dq6 = d2x;
+
+        dq = [dq1; dq2; dq3; dq4; dq5; dq6];
+
+    catch ME
+
+        warningCallback(ME.message);
+        dq = zeros(size(q)); % Return zeros if error occurs
+    end
+
+end
+
+
+function [Fluid_forces] = getFluidForcesUnified(q,freeParams, obj)
+
+    bx_hat = [cos(q(3)); sin(q(3)); 0];
+    by_hat = [-sin(q(3)); cos(q(3));0];
+
+    l = q(1); dl = q(2);  % leg length and rate
+    qB = q(3); dqB = q(4); % leg angle and rate from ground
+    x = q(5); dx = q(6);   % foot position and vel
+
+    wB = freeParams.finWidth;
+
+    Fdrag = [0;0;0]; % drag force on leg
+    Torque_water = [0;0;0]; % torque of drag force about foot;
+
+    numForces = numel(ss_tmp);
+    deltaLegDrags = zeros(numForces,3);
+    iter = 1;
+    for ss = obj.SimulationInfo.params.ss_tmp % integrate over fin
+
+        %vel_p = [dx;0;0] + dqB*ss*by_hat;
+        vel_p = [dx;0;0] + dqB*ss*by_hat; % velocity of point p. Located at distance ss from the foot.
+        vel_hat = vel_p/norm(vel_p + epsilonV); % unit vector along velocity at point p
+
+        lambda_hat = cross(vel_hat,[0;0;1]); % unit vector perpendicular to velocity of p
+
+        segment_len_projection = abs( dot(delta_s*bx_hat, lambda_hat) ) ; % length of projection of ds onto lamba
+
+        Frontal_area = segment_len_projection*wB;
+
+        Fdrag_segment = -0.5*obj.SimulationInfo.params.rho*obj.SimulationInfo.params.Cd_leg*Frontal_area*vel_p*norm(vel_p); % segment drag contribution.
+        TorqueDrag_segment = cross(ss*bx_hat,Fdrag_segment); % about foot
+
+        Fdrag = Fdrag + Fdrag_segment;
+        Torque_water = Torque_water + TorqueDrag_segment;
+
+        deltaLegDrags(iter,:) = [Fdrag_segment(1) Fdrag_segment(2) ss];
+        iter = iter + 1;
+    end
+
+    Torque_water_Bcm = Torque_water - cross(0.5*freeParams.finWidth*bx_hat,Fdrag); % torque of water about cm of fin.
+
+    vel_H = q(2)*bx_hat + q(1)*q(4)*by_hat + q(6)*[1;0;0]; % velocity of the hip
+
+    Fdrag_hip = -0.5*obj.SimulationInfo.params.rho*pi*obj.SimulationInfo.params.Cd_hip*obj.SimulationInfo.params.R_2*vel_H*norm(vel_H);
+
+    Fluid_forces = [Fdrag_hip(1); Fdrag_hip(2); Fdrag_segment(1); Fdrag_segment(2); obj.SimulationInfo.params.Fbuoy_hip_y; Torque_water_Bcm(3)];
+
+end
+
+function ldes = ldesFunc(t,obj)
+    idx = ceil(t*length(obj.ODEVariables.traj(:,1))*obj.SimulationInfo.freq);
     if(idx==0)
         idx = 1;
     end
-    xdes = traj(idx,1);
-    zdes = traj(idx,2);
+    xdes = obj.ODEVariables.traj(idx,1);
+    zdes = obj.ODEVariables.traj(idx,2);
+    ldes = sqrt(xdes^2+zdes^2);
+end
 
-    hold on
-    plot(xdes,zdes,'or')
+function qBdes = qBdesFunc(t,obj)
+    idx = ceil(t*length(obj.ODEVariables.traj(:,1))*obj.SimulationInfo.freq);
+    if(idx==0)
+        idx = 1;
+    end
+    xdes = obj.ODEVariables.traj(idx,1);
+    zdes = obj.ODEVariables.traj(idx,2);
+    qBdes = atan2(zdes,xdes) + pi;
+end
+
+function dldes = dldesFunc(t,obj)
+    idx = ceil(t*length(obj.ODEVariables.traj(:,1))*obj.SimulationInfo.freq);
+    if(idx==0)
+        idx = 1;
+    end
+    xdes = obj.ODEVariables.traj(idx,1);
+    zdes = obj.ODEVariables.traj(idx,2);
+    ldes = sqrt(xdes^2+zdes^2);
+
+    xdes1 = obj.ODEVariables.traj(idx+1,1);
+    zdes1 = obj.ODEVariables.traj(idx+1,2);
+    ldes1 = sqrt(xdes1^2+zdes1^2);
+
+    dt = 1/freq/length(obj.ODEVariables.traj(:,1));
+
+    dldes = (ldes1-ldes)/dt;
+
+end
+
+function dqBdes = dqBdesFunc(t,obj)
+    idx = ceil(t*length(obj.ODEVariables.traj(:,1))*obj.SimulationInfo.freq);
+    if(idx==0)
+        idx = 1;
+    end
+    xdes = obj.ODEVariables.traj(idx,1);
+    zdes = obj.ODEVariables.traj(idx,2);
+    qBdes = atan2(zdes,xdes);
+
+    xdes1 = obj.ODEVariables.traj(idx+1,1);
+    zdes1 = obj.ODEVariables.traj(idx+1,2);
+    qBdes1 = atan2(zdes1,xdes1);
+
+    dt = 1/freq/length(obj.ODEVariables.traj(:,1));
+    dqBdes = (qBdes1-qBdes)/dt;
 end
 
 
-% initial conditions
 
 
-l0 = ldesFunc(0,traj,freq);
-qB0 = qBdesFunc(0,traj,freq);
-
-% Find initial conditions that are consistent with initial hip velocity
-%vx_hip  = dx + cos(qB)*dl - l*sin(qB)*dqB;
-%vy_hip  = sin(qB)*dl - l*cos(qB)*dqB;
-
-M = [cos(qB0) -l0*sin(qB0); sin(qB0) l0*cos(qB0)];
-tmp = inv(M)*[vx0_hip;vy0_hip];
-
-dl0 = tmp(1); dqB0 = tmp(2);
-
-x0 = 0;
-dx0 = 0; % initial foot position and velocity
-
-
-tspan = [0 stance_duration];
-
-q0 = [l0 dl0 qB0 dqB0 x0 dx0];
-
-% Set event function
-options = odeset('Events', @swim_event_func);
-
-isSliding = 0;
-%[t, q] = ode45(@(t, q) odefun_unifiedstance(t,q, traj, freq, freeParams), tspan, q0, options);
-[t, q] = ode23s(@(t, q) odefun_unifiedstance(t,q, traj, freq, freeParams), tspan, q0, options);
-
-footPos = q(:,5);
-
-figure
-plot(t,footPos)
-ylabel('FootPosition(m)')
-xlabel('time (s)')
-
-%keyboard()
-FPS = 100;
-animateUnified(t,q,FPS)
-
-
-%
-%
-%
-%
-%
-% % compute Ground reaction forces
-% isSliding = 0;
-% for iter = 1:numel(t)
-%
-%     tt = t(iter);
-%     qq = q(iter,:);
-%
-%     l = qq(1); dl = qq(2);
-%     qB = qq(3); dqB = qq(4);
-%     x = qq(5); dx = qq(6);
-%
-%     ldes = ldesFunc(tt,traj,freq); % desired leg length
-%     qBdes = qBdesFunc(tt,traj,freq); % desired leg angle from horizontal
-%
-%     dldes = dldesFunc(tt,traj,freq); % desired rates
-%     dqBdes = dqBdesFunc(tt,traj,freq);
-%
-%     Tau = kp_ang * (qBdes - qB) +  kd_ang * (dqBdes - dqB);
-%
-%     % Compute fluid forces
-%     [Fluid_forces, deltaLegDrags] = getFluidForcesUnified(qq);
-%
-%     %%
-%
-%     %% Apply switching logic
-%
-%     switch(isSliding)
-%         case 0      % sticking
-%         % Force of friction is unknown and d2x = 0
-%         % Use stick dynamics
-%
-%         Maug = M_aug_func_stick([l; qB]);
-%         fside = f_func_stick([l; qB; Tau; ldes],[dl; dqB],Fluid_forces);
-%
-%         ddq_aug_stick = Maug^-1*fside; % [d2l d2qB Ff Fn]
-%
-%         d2l = ddq_aug_stick(1);
-%         d2qB = ddq_aug_stick(2);
-%         d2x = 0; % forced to zero during sticktion
-%
-%         Ff = ddq_aug_stick(3); % friction (solved for)
-%         Fn = ddq_aug_stick(4); % normal
-%
-%         if(  abs(Ff) > mus*abs(Fn) )
-%             isSliding = 1;
-%             %keyboard()
-%         end
-%
-%
-%     case 1      %sliding
-%         % Force of friction is specified and d2x is unknown
-%         % Use continuous friction
-%         Maug = M_aug_func_slide([l; qB],[dx]);
-%         fside = f_func_slide([l; qB; Tau; ldes],[dl; dqB],Fluid_forces);
-%
-%         ddq_aug_slide = Maug^-1*fside; % ddq_aug = [ddl ddqB ddx Fn];
-%
-%         d2l = ddq_aug_slide(1);
-%         d2qB = ddq_aug_slide(2);
-%         d2x = ddq_aug_slide(3);
-%         Fn = ddq_aug_slide(4);
-%
-%
-%         footVel = dx;
-%         Ff = -muk*dx*abs(Fn)/(abs(dx) + epsilonV);  % specified friction
-%
-%
-%         if ( ( abs(footVel) < epsilonV ) && ( abs(Ff) < mus*abs(Fn) ) )
-%             isSliding = 0;
-%         end
-%
-%
-%
-%     end
-%
-%
-%     Friction(iter) = Ff;
-%     NormalForce(iter) = Fn;
-%
-%
-%
-% end
-%
-%
-%
-% figure()
-%
-% subplot(2,1,1)
-%     plot(t,Friction)
-%     ylabel('Friction (N)')
-%
-%  subplot(2,1,2)
-%    plot(t,NormalForce)
-%    ylabel('Normal Force (N)')
-
-
-%% My version of GetParams
-
-function obj = jv_getParams()
-
+%% Params only
+function obj = getParams()
     obj.SimulationInfo.params.g = 9.8;
 
     obj.SimulationInfo.params.mH = 18.8; %  % Hip mass (two legs in stance)
@@ -353,26 +358,26 @@ function obj = jv_getParams()
     obj.ODEVariables.qB_traj = atan2(obj.ODEVariables.traj(:, 2), obj.ODEVariables.traj(:, 1)) + pi;
 
     %Precompute inverse of M matrix
-    % l0 = ldesFunc(0,obj);
-    % qB0 = qBdesFunc(0,obj);
-    % M = [cos(qB0) -l0*sin(qB0); sin(qB0) l0*cos(qB0)];
-    % obj.ODEVariables.Minv = M\eye(2);
+    l0 = ldesFunc(0,obj);
+    qB0 = qBdesFunc(0,obj);
+    M = [cos(qB0) -l0*sin(qB0); sin(qB0) l0*cos(qB0)];
+    obj.ODEVariables.Minv = M\eye(2);
 
-    % M = [cos(qB0) -l0*sin(qB0); sin(qB0) l0*cos(qB0)];
-    % tmp = M\[obj.SimulationInfo.vx0_hip; obj.SimulationInfo.vy0_hip];
-    % 
-    % dl0 = tmp(1); dqB0 = tmp(2);
-    % 
-    % x0 = 0;
-    % dx0 = 0; % initial foot position and velocity
+    M = [cos(qB0) -l0*sin(qB0); sin(qB0) l0*cos(qB0)];
+    tmp = M\[obj.SimulationInfo.vx0_hip; obj.SimulationInfo.vy0_hip];
 
+    dl0 = tmp(1); dqB0 = tmp(2);
 
-    % obj.ODEVariables.tspan = [0 obj.SimulationInfo.stance_duration];
-    % 
-    % obj.ODEVariables.q0 = [l0 dl0 qB0 dqB0 x0 dx0];
+    x0 = 0;
+    dx0 = 0; % initial foot position and velocity
 
 
-    obj.SimulationInfo.params.delta_s = 0.02;
+    obj.ODEVariables.tspan = [0 obj.SimulationInfo.stance_duration];
+
+    obj.ODEVariables.q0 = [l0 dl0 qB0 dqB0 x0 dx0];
+
+
+    obj.SimulationInfo.params.delta_s = 0.01;
     obj.SimulationInfo.params.ss_tmp = 0:obj.SimulationInfo.params.delta_s:obj.SimulationInfo.params.finLen; %iterate over fin
     obj.SimulationInfo.params.numForces = numel(obj.SimulationInfo.params.ss_tmp);
     obj.SimulationInfo.params.deltaLegDrags = zeros(obj.SimulationInfo.params.numForces,3);
@@ -383,117 +388,9 @@ function obj = jv_getParams()
     obj.PSOInfo.LB= [5 0.1 10 0.1 0.1 0.1 0.1];
     obj.PSOInfo.UB= [30 10 60 3 3 100];
     obj.PSOInfo.options = optimoptions('particleswarm', 'SwarmSize', 300, 'UseParallel', true);
-    obj.PSOInfo.nvars = 7;
+    obj.PSOInfo.nvars = 5;
 
     obj.SimulationInfo.params.dt_inv = obj.SimulationInfo.freq/length(obj.ODEVariables.traj(:,1));
 
 
-end
-
-function [dq] = jv_odefun_unifiedstance(t,q, traj, freq, freeParams)
-
-    global isSliding;
-    global Fnormal;
-
-    l = q(1); dl = q(2);
-    qB = q(3); dqB = q(4);
-    x = q(5); dx = q(6);
-
-
-    params = getParams();
-
-    g = params.g;
-    mH = params.mH; % Hip mass
-    mQ = params.mQ; % Foot mass
-    k = params.k;   % leg stifness (N/m)
-    epsilonV = params.epsilonV;
-
-    kp_ang = freeParams.kp_ang; % controller gains for applied torque on leg
-    kd_ang = freeParams.kd_ang;
-    muk = freeParams.muk;
-    mus = freeParams.mus;
-
-
-    try
-
-        ldes = ldesFunc(t,traj,freq); % desired leg length
-        qBdes = qBdesFunc(t,traj,freq); % desired leg angle from horizontal
-
-        dldes = dldesFunc(t,traj,freq); % desired rates
-        dqBdes = dqBdesFunc(t,traj,freq);
-
-        Tau = kp_ang * (qBdes - qB) +  kd_ang * (dqBdes - dqB);
-
-        % Compute Fluid Forces (drag forces on hip h, drag forces on leg l, torque
-        % due to water
-        [Fluid_forces, deltaLegDrags] = getFluidForcesUnified(q, freeParams);
-
-
-
-        %% Apply switching logic
-        isSliding
-        switch(isSliding)
-            case 0      % sticking
-                % Force of friction is unknown and d2x = 0
-                % Use stick dynamics
-
-                Maug = M_aug_func_stick([l; qB]);
-                fside = f_func_stick([l; qB; Tau; ldes],[dl; dqB],Fluid_forces);
-
-                ddq_aug_stick = Maug^-1*fside; % [d2l d2qB Ff Fn]
-
-                d2l = ddq_aug_stick(1);
-                d2qB = ddq_aug_stick(2);
-                d2x = 0; % forced to zero during sticktion
-
-                Ff = ddq_aug_stick(3); % friction (solved for)
-                Fn = ddq_aug_stick(4); % normal
-
-                if(  abs(Ff) > mus*abs(Fn) )
-                    isSliding = 1;
-                end
-
-
-                % if(  abs(Ff) > realmax ) % inifinite friction
-                %     isSliding = 1;
-                % end
-
-
-            case 1      %sliding
-                % Force of friction is specified and d2x is unknown
-                % Use continuous friction
-                Maug = M_aug_func_slide([l; qB],[dx],[muk]);
-                fside = f_func_slide([l; qB; Tau; ldes],[dl; dqB],Fluid_forces);
-
-                ddq_aug_slide = Maug^-1*fside; % ddq_aug = [ddl ddqB ddx Fn];
-
-                d2l = ddq_aug_slide(1);
-                d2qB = ddq_aug_slide(2);
-                d2x = ddq_aug_slide(3);
-                Fn = ddq_aug_slide(4);
-
-
-                footVel = dx;
-                Ff = -muk*dx*abs(Fn)/(abs(dx) + epsilonV);  % specified friction
-
-
-                if ( ( abs(footVel) < epsilonV ) && ( abs(Ff) < mus*abs(Fn) ) )
-                    isSliding = 0;
-                end
-
-
-
-        end
-
-        Fnormal = Fn;
-
-        dq1 = dl; dq2 = d2l;
-        dq3 = dqB; dq4 = d2qB;
-        dq5 = dx;  dq6 = d2x;
-
-        dq = [dq1; dq2; dq3; dq4; dq5; dq6];
-    catch ME
-        warningCallback(ME.message);
-        dq = zeros(size(q)); % return 0s if error occurs
-    end
 end
