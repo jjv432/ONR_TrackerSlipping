@@ -69,9 +69,6 @@ end
 function [footPos, time, isWarning]= UnifiedModelLight(newFreeParams, obj)
     global Fn
     Fn = 1;
-    %
-    % global isSliding
-    % isSliding = 1;
 
     %% Free Params used for Model Tunning
     freeParams.finWidth = newFreeParams(1);
@@ -80,9 +77,6 @@ function [footPos, time, isWarning]= UnifiedModelLight(newFreeParams, obj)
     freeParams.kd_ang = newFreeParams(4);
     freeParams.mus = newFreeParams(5);
 
-
-    % freeParams.kd_ang = 0.1*newFreeParams(3);
-    % freeParams.mus = 1.3*newFreeParams(2);
 
 
     %% Trajectory sent to the robot
@@ -200,7 +194,7 @@ function [dq] = odefun_unifiedstance(t,q,freeParams, obj)
 
     catch ME
 
-        warningCallback(ME.message);
+        % warningCallback(ME.message);
         dq = zeros(size(q)); % Return zeros if error occurs
     end
 
@@ -312,7 +306,14 @@ function dqBdes = dqBdesFunc(t,obj)
     dqBdes = (qBdes1-qBdes)/dt;
 end
 
+% Event function to detect liftoff
+function [value,isterminal,direction] = swim_event_func(t,q, tstart, Fnormal)
 
+    value(1) = Fnormal;
+    value(2) = toc(tstart) < 30;
+    isterminal = true(size(value));  % Stop integration when event occurs
+    direction = -1;  % Detect when Fn crosses zero from positive to negative
+end
 
 
 %% Params only
