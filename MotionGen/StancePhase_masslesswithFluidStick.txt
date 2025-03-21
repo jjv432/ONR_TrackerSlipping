@@ -1,0 +1,82 @@
+% Torque and Force actuated slip
+% Foot is at No
+% Leg is massless and has compliance
+% Foot and Hip are particles
+% 2 DOF system (l, qB)
+%------------------------------------------------------------
+NewtonianFrame N              % Earth.
+Particle       H	      % Hip
+RigidFrame     B              % Leg (massless)
+Particle       Q              % Foot
+Point          Bc(B)          % center point of leg
+
+H.SetMass( mH = 9.4 kg )      % Half of the weigth of the robot
+Q.SetMass (mQ = 0.2 kg )      % Foot mass
+Constant  g = 9.8 m/s^2       % Earth's gravitational acceleration.
+Variable l''                  % leg length (hip to foot)
+Specified ldes                % desired leg length
+Specified Tau                 % torque on leg from the world
+Variable qB''                 % Angle of leg bx> with respect to nx> with +nz> direction
+Constant k = 13592 N/m        % Leg linear spring stifness
+
+Variable   Fn                 % Resultant normal force on foot.
+Variable   Ff                 % Resultant friction force on foot.
+
+%----- Rotational and translational kinematic --------------------
+B.RotateZ(N, qB)
+
+Q.Translate( No,  0*nx> )     % Foot sticking to the ground at x = 0
+H.Translate ( No, l*bx> )     % Location of the hip
+Bc.Translate (No, 0.5*l*bx>)  % Location of center point of the leg
+
+
+% ----- Compute velocities of interest for drag calculations ------
+
+H.GetVelocity(N)  	   % velocity of the hip
+Bc.GetVelocity(N)	   % velocity of the center of the leg
+
+
+
+% Add relevant contact and distance forces
+System.AddForceGravity( -g*Ny> )
+stretch = l - ldes
+ 
+
+% Fluid Forces
+Specified Fdl_x              	% drag force on leg along nx> direction
+Specified Fdl_y              	% drag force on leg along ny> direction
+Specified Fdh_x              	% drag force on hip in nx> direction
+Specified Fdh_y              	% drag force on hip in ny> direction
+
+Specified Fbh_y              	% Buoyant force on hip
+Specified T_w                	% drag moment from water on leg
+
+Fdh> = Fdh_x*nx> + Fdh_y*ny>
+
+H.AddForce(Q, -k*stretch*bx>)  	% Spring force from foot on hip
+H.AddForce(Fdh> + Fbh_y*ny>)  	% Drag and buoyant forces on the Hip
+ 
+B.AddTorque( N, Tau*Nz> )      	% Torque excerted by the world on the leg 
+B.AddTorque( N, T_w*Nz> )      	% Torque excerted by the water on the leg 
+BC.AddForce(Fdl_x*Nx> + Fdl_y*Ny>)  % For this force analysis 
+Q.AddForce(Fn*ny> + Ff*nx>)     % Resultant normal and friction forces on foot
+
+%   Equations of motion
+Dynamics[1] = Dot( nx>,  System(H,B,Q).GetDynamics() )    % Ff
+Dynamics[2] = Dot( ny>,  System(H,B,Q).GetDynamics() )    % Fn
+Dynamics[3] = Dot( bx>,  System(H,B).GetDynamics() )      % l''
+Dynamics[4] = Dot( nz>,  System(H,B).GetDynamics(Q) )     % qB''
+
+express(H.GetVelocity(N),N)  	 % velocity of the hip
+express(Bc.GetVelocity(N),N)	 % velocity of the center of the leg
+
+
+
+
+%   Solve dynamics equation for l'', qB'', Ff, Fn 
+%Solve( Dynamics = 0,   l'', qB'', Ff, Fn)
+
+
+
+%-----------------------------------------------------------------------------
+

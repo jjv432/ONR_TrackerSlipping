@@ -1,0 +1,4 @@
+mH*x'' + mQ*x'' - Fdh_x - Fdl_x - Ff - mH*sin(qB)*(2*l'*qB'+l*qB'') - mH*cos(qB)*(l*qB'^2-l'')
+mH*g + mQ*g + mH*cos(qB)*(2*l'*qB'+l*qB'') - Fbh_y - Fdh_y- Fdl_y - Fn - mH*sin(qB)*(l*qB'^2-l'')
+(mH*g-Fbh_y-Fdh_y-Fdl_y)*sin(qB) + k*stretch - mH*(l*qB'^2-l'') - cos(qB)*(Fdh_x+Fdl_x-mH*x'')
+Fdh_x*l*sin(qB) + 0.5*Fdl_x*l*sin(qB) + (mH*g-Fbh_y-Fdh_y)*l*cos(qB) + mH*l*(2*l'*qB'+l*qB'') - Tau - T_w - 0.5*Fdl_y*l*cos(qB) - mH*l*sin(qB)*x''
