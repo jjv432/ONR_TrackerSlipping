@@ -1,4 +1,5 @@
 clc; clear; close all; format compact
+pause(1);
 
 obj = getParams();
 
@@ -27,7 +28,7 @@ qB0 = qBdesFunc(0, obj);
 % Should vary with frequency
 
 %  FIX THIS!!!!!
-obj.ODEVariables.tspan = t_results.t(1:StatsLength/3);
+obj.ODEVariables.tspan = t_results.t(1:StatsLength/2);
 
 %% Testing
 
@@ -57,6 +58,8 @@ hold on
 plot(time, footPos, 'xr');
 plot(cur_t_vals, cur_x_vals, 'k');
 legend("Best Simulation", "Experimental Data");
+
+delete(gcp("nocreate"))
 %%
 
 function [Cost] = ModelSimulationCost(freeParams, obj, p)
@@ -93,8 +96,8 @@ function [footPos, time, isWarning]= UnifiedModelLight(newFreeParams, obj, lastR
     freeParams.finWidth = newFreeParams(1);
     freeParams.muk = newFreeParams(2);
     freeParams.kp_ang = newFreeParams(3);
-    freeParams.kd_ang = newFreeParams(4);
-    freeParams.mus = newFreeParams(5);
+    freeParams.kd_ang = .1*freeParams.kp_ang;
+    freeParams.mus = 1.5*freeParams.muk;
 
     %% Trajectory sent to the robot
 
@@ -106,9 +109,9 @@ function [footPos, time, isWarning]= UnifiedModelLight(newFreeParams, obj, lastR
     warning('error', 'MATLAB:ode23s:IntegrationTolNotMet');
     try
         if ~lastRun
-            [t, q] = ode23s(@(t, q) odefun_unifiedstance(t,q, freeParams, obj), obj.ODEVariables.tspan, obj.ODEVariables.q0, odeset('RelTol', 5e-2, 'Events', @(t, q) swim_event_func(t, q, tstart, Fn)));
+            [t, q] = ode23s(@(t, q) odefun_unifiedstance(t,q, freeParams, obj), obj.ODEVariables.tspan, obj.ODEVariables.q0, odeset('RelTol', 1e-2, 'Events', @(t, q) swim_event_func(t, q, tstart, Fn)));
         else
-            [t, q] = ode23s(@(t, q) odefun_unifiedstance(t,q, freeParams, obj), obj.ODEVariables.tspan, obj.ODEVariables.q0, odeset('RelTol', 5e-2,'Events', @(t, q) swim_event_func_no_time(t, q, tstart, Fn)));
+            [t, q] = ode23s(@(t, q) odefun_unifiedstance(t,q, freeParams, obj), obj.ODEVariables.tspan, obj.ODEVariables.q0, odeset('RelTol', 1e-2,'Events', @(t, q) swim_event_func_no_time(t, q, tstart, Fn)));
         end
         footPos = q(:,5);
         time = t;
@@ -400,12 +403,12 @@ function obj = getParams()
     obj.SimulationInfo.params.Fbuoy_hip_y = obj.SimulationInfo.params.rho*obj.SimulationInfo.params.Vol_hip*obj.SimulationInfo.params.g;
 
 
-    obj.PSOInfo.LB= [0 0.1 65 4 0.1];
-    obj.PSOInfo.UB= [2 4 80 10 3];
+    obj.PSOInfo.LB= [0 0 72];
+    obj.PSOInfo.UB= [1 2 74];
     numparticles = 4;
-    init_points = ones([numparticles, 5]) .* [8.18/100 1.0 73 7.3 1.5] ;
+    init_points = ones([numparticles, 3]) .* [8.18/100 1.0 73] ;
     obj.PSOInfo.options = optimoptions('particleswarm', 'SwarmSize', numparticles, 'UseParallel', true, 'InitialPoints', init_points, 'MaxIterations', 1);
-    obj.PSOInfo.nvars = 5;
+    obj.PSOInfo.nvars = 3;
 
     obj.SimulationInfo.params.dt_inv = obj.SimulationInfo.freq/length(obj.ODEVariables.traj(:,1));
 
