@@ -19,7 +19,7 @@ load("T_Results.mat");
 
 t_results = t(15);
 % StatsLength = t_results.StatsPlottingTrialLength;
-StatsLength = 8;
+StatsLength = t_results.StatsPlottingTrialLength/2;
 cur_t_vals = t_results.t(1:StatsLength);
 cur_x_vals = t_results.MeanXPosition(1:StatsLength);
 
