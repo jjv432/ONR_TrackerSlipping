@@ -116,7 +116,7 @@ function [footPos, time, isWarning, TooLong]= UnifiedModelLight(newFreeParams, o
     freeParams.kp_ang = newFreeParams(3);
     freeParams.kd_ang = newFreeParams(4);
     freeParams.mus = newFreeParams(5);
-    obj.SimulationInfo.params.epsilonV = newFreeParams(6);
+    % freeParams.mus = 1.5*freeParams.muk;
 
     %% Trajectory sent to the robot
 
@@ -374,19 +374,11 @@ end
 
 % Event function to detect liftoff
 function [value,isterminal,direction] = swim_event_func(t,q, tstart, Fnormal)
-    global TooLong maxTime
+    global TooLong
 
-    maxTime = 10;
-
-
-    if toc(tstart) >= 10
-
-        TooLong = 1;
-    else
-        TooLong = 0;
-    end
+    TooLong = 1;
     value(1) = Fnormal;
-    value(2) = toc(tstart) < 10;
+    value(2) = toc(tstart) < 5;
     isterminal = true(size(value));  % Stop integration when event occurs
     direction = -1;  % Detect when Fn crosses zero from positive to negative
 end
@@ -465,14 +457,14 @@ function obj = getParams()
     obj.SimulationInfo.params.Fbuoy_hip_y = obj.SimulationInfo.params.rho*obj.SimulationInfo.params.Vol_hip*obj.SimulationInfo.params.g;
 
 
-    obj.PSOInfo.LB= [0 0 72 7 0 1e-5];
-    obj.PSOInfo.UB= [1 2 74 8 3 1e-3];
+    obj.PSOInfo.LB= [0 0 72 7 0];
+    obj.PSOInfo.UB= [1 2 74 8 3];
     numparticles = 32;
     % init_points = ones([numparticles/2, 5]) .* [8.18/100 1.0 73 7.2 1.5] ;
     init_points = [];
     obj.PSOInfo.options = optimoptions('particleswarm', 'SwarmSize', numparticles, 'UseParallel', true, 'InitialPoints', init_points, 'MaxIterations', 25);
     % obj.PSOInfo.options = optimoptions('particleswarm', 'SwarmSize', numparticles, 'UseParallel', false, 'InitialPoints', init_points, 'MaxIterations', 1);
-    obj.PSOInfo.nvars = 6;
+    obj.PSOInfo.nvars = 5;
 
     obj.SimulationInfo.params.dt_inv = obj.SimulationInfo.freq/length(obj.ODEVariables.traj(:,1));
 
