@@ -1,6 +1,4 @@
-addpath("ModelFunctionsFiles");
-addpath("ModelFunctionsFiles\autoSlide\")
-addpath("ModelFunctionsFiles\autoStick\")
+clc; clear; 
 
 appFile = "unifiedfriction_simulation.m"; % File that you're making the .exe off of
 buildResults = compiler.build.standaloneApplication(appFile, 'AdditionalFiles', {'ModelFunctionsFiles/walk_test_2.txt', 'tracker_file.m', 'T_Results.mat'}); % any files that the main script references

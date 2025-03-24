@@ -1,18 +1,21 @@
 clc; clear; close all; format compact
-% parpool
 
+obj = getParams();
+
+
+%%
 
 global isSliding
 isSliding = 0;
 
 load("T_Results.mat");
 
-
-obj = getParams();
-
 t_results = t(15);
-cur_t_vals = t_results.t(1:t_results.StatsPlottingTrialLength);
-cur_x_vals = t_results.MeanXPosition(1:t_results.StatsPlottingTrialLength);
+StatsLength = t_results.StatsPlottingTrialLength;
+cur_t_vals = t_results.t(1:StatsLength);
+cur_x_vals = t_results.MeanXPosition(1:StatsLength);
+% cur_t_vals = t_results.t(1:t_results.StatsPlottingTrialLength);
+% cur_x_vals = t_results.MeanXPosition(1:t_results.StatsPlottingTrialLength);
 
 p = polyfit(cur_t_vals, cur_x_vals, 13);
 
@@ -22,6 +25,19 @@ l0 = ldesFunc(0, obj);
 qB0 = qBdesFunc(0, obj);
 
 % Should vary with frequency
+
+%  FIX THIS!!!!!
+obj.ODEVariables.tspan = t_results.t(1:StatsLength/3);
+
+%% Testing
+
+% parm = [0 3.7762 80 10 1.6924];
+%
+% [x t] = UnifiedModelLight(parm, obj, 0);
+% figure()
+% plot(x,t)
+
+
 
 %% Run PSO
 
@@ -34,7 +50,7 @@ fprintf("\n\nPSO Completed in %.3f seconds", toc(psoTimer));
 
 disp(OptimizedState);
 
-[footPos, time] = UnifiedModelLight(OptimizedState, obj);
+[footPos, time] = UnifiedModelLight(OptimizedState, obj, 1);
 
 figure
 hold on
@@ -47,9 +63,9 @@ function [Cost] = ModelSimulationCost(freeParams, obj, p)
 
     timerVal = tic;
     fprintf("Starting a Simulation...");
-    % Run the simulation to determine the range of x values
-    [simulation_x_array, simulation_time, warning] = UnifiedModelLight(freeParams, obj);
 
+    % Run the simulation to determine the range of x values
+    [simulation_x_array, simulation_time, warning] = UnifiedModelLight(freeParams, obj, 0);
 
     if warning
         Cost = 1e6;
@@ -58,7 +74,7 @@ function [Cost] = ModelSimulationCost(freeParams, obj, p)
 
         % Making the cost dependent on the rang of points the ODE solves for
 
-        Cost = (norm(simulation_x_array - data_spline)^2) * abs(2/numel(simulation_time));
+        Cost = sum(abs((simulation_x_array - data_spline)));
     end
 
     fprintf("dt: %.3f seconds\n", toc(timerVal));
@@ -66,9 +82,12 @@ function [Cost] = ModelSimulationCost(freeParams, obj, p)
 
 end
 
-function [footPos, time, isWarning]= UnifiedModelLight(newFreeParams, obj)
+function [footPos, time, isWarning]= UnifiedModelLight(newFreeParams, obj, lastRun)
     global Fn
     Fn = 1;
+
+    global isSliding
+    isSliding = 0;
 
     %% Free Params used for Model Tunning
     freeParams.finWidth = newFreeParams(1);
@@ -76,8 +95,6 @@ function [footPos, time, isWarning]= UnifiedModelLight(newFreeParams, obj)
     freeParams.kp_ang = newFreeParams(3);
     freeParams.kd_ang = newFreeParams(4);
     freeParams.mus = newFreeParams(5);
-
-
 
     %% Trajectory sent to the robot
 
@@ -88,7 +105,11 @@ function [footPos, time, isWarning]= UnifiedModelLight(newFreeParams, obj)
     % Convert the specific warning to an error
     warning('error', 'MATLAB:ode23s:IntegrationTolNotMet');
     try
-        [t, q] = ode23s(@(t, q) odefun_unifiedstance(t,q, freeParams, obj), obj.ODEVariables.tspan, obj.ODEVariables.q0, odeset('Events', @(t, q) swim_event_func(t, q, tstart, Fn)));
+        if ~lastRun
+            [t, q] = ode23s(@(t, q) odefun_unifiedstance(t,q, freeParams, obj), obj.ODEVariables.tspan, obj.ODEVariables.q0, odeset('RelTol', 5e-2, 'Events', @(t, q) swim_event_func(t, q, tstart, Fn)));
+        else
+            [t, q] = ode23s(@(t, q) odefun_unifiedstance(t,q, freeParams, obj), obj.ODEVariables.tspan, obj.ODEVariables.q0, odeset('RelTol', 5e-2,'Events', @(t, q) swim_event_func_no_time(t, q, tstart, Fn)));
+        end
         footPos = q(:,5);
         time = t;
         isWarning = 0;
@@ -114,89 +135,79 @@ function [dq] = odefun_unifiedstance(t,q,freeParams, obj)
     qB = q(3); dqB = q(4);
     x = q(5); dx = q(6);
 
-    try
-        ldes = ldesFunc(t,traj,freq); % desired leg length
-        qBdes = qBdesFunc(t,traj,freq); % desired leg angle from horizontal
 
-        dldes = dldesFunc(t,traj,freq); % desired rates
-        dqBdes = dqBdesFunc(t,traj,freq);
+    ldes = ldesFunc(t,obj); % desired leg length
+    qBdes = qBdesFunc(t,obj); % desired leg angle from horizontal
+    dldes = dldesFunc(t,obj); % desired rates
+    dqBdes = dqBdesFunc(t,obj);
 
-        Tau = freeParams.kp_ang * (qBdes - q(3)) +  freeParams.kd_ang * (dqBdes - q(4));
+    Tau = freeParams.kp_ang * (qBdes - q(3)) +  freeParams.kd_ang * (dqBdes - q(4));
 
-        % Compute Fluid Forces (drag forces on hip h, drag forces on leg l, torque
-        % due to water
-        [Fluid_forces] = getFluidForcesUnified(q, freeParams, obj);
+    % Compute Fluid Forces (drag forces on hip h, drag forces on leg l, torque
+    % due to water
+    [Fluid_forces] = getFluidForcesUnified(q, freeParams, obj);
 
+    %% Apply switching logic
+    % isSliding = 1;
+    if isSliding == 0   % sticking
+        % Force of friction is unknown and d2x = 0
+        % Use stick dynamics
 
+        Maug = M_aug_func_stick([l; qB]);
+        fside = f_func_stick([l; qB; Tau; ldes],[dl; dqB],Fluid_forces);
 
-        %% Apply switching logic
-        % isSliding = 1;
-        switch(isSliding)
-            case 0      % sticking
-                % Force of friction is unknown and d2x = 0
-                % Use stick dynamics
+        ddq_aug_stick = Maug^-1*fside; % [d2l d2qB Ff Fn]
 
-                Maug = M_aug_func_stick([l; qB]);
-                fside = f_func_stick([l; qB; Tau; ldes],[dl; dqB],Fluid_forces);
+        d2l = ddq_aug_stick(1);
+        d2qB = ddq_aug_stick(2);
+        d2x = 0; % forced to zero during sticktion
 
-                ddq_aug_stick = Maug^-1*fside; % [d2l d2qB Ff Fn]
+        Ff = ddq_aug_stick(3); % friction (solved for)
+        Fn = ddq_aug_stick(4); % normal
 
-                d2l = ddq_aug_stick(1);
-                d2qB = ddq_aug_stick(2);
-                d2x = 0; % forced to zero during sticktion
-
-                Ff = ddq_aug_stick(3); % friction (solved for)
-                Fn = ddq_aug_stick(4); % normal
-
-                if(  abs(Ff) > freeParams.mus*abs(Fn) )
-                    isSliding = 1;
-                end
-
-
-                % if(  abs(Ff) > realmax ) % inifinite friction
-                %     isSliding = 1;
-                % end
-
-
-            case 1      %sliding
-                % Force of friction is specified and d2x is unknown
-                % Use continuous friction
-                Maug = M_aug_func_slide([l; qB],[dx],[freeParams.muk]);
-                fside = f_func_slide([l; qB; Tau; ldes],[dl; dqB],Fluid_forces);
-
-                ddq_aug_slide = Maug^-1*fside; % ddq_aug = [ddl ddqB ddx Fn];
-
-                d2l = ddq_aug_slide(1);
-                d2qB = ddq_aug_slide(2);
-                d2x = ddq_aug_slide(3);
-                Fn = ddq_aug_slide(4);
-
-
-                footVel = dx;
-                Ff = -freeParams.muk*dx*abs(Fn)/(abs(dx) + obj.SimulationInfo.params.epsilonV);  % specified friction
-
-
-                if ( ( abs(footVel) < obj.SimulationInfo.params.epsilonV ) && ( abs(Ff) < freeParams.mus*abs(Fn) ) )
-                    isSliding = 0;
-                end
-
-
-
+        if(  abs(Ff) > freeParams.mus*abs(Fn) )
+            isSliding = 1;
         end
 
-        Fnormal = Fn
 
-        dq1 = dl; dq2 = d2l;
-        dq3 = dqB; dq4 = d2qB;
-        dq5 = dx;  dq6 = d2x;
+        % if(  abs(Ff) > realmax ) % inifinite friction
+        %     isSliding = 1;
+        % end
 
-        dq = [dq1; dq2; dq3; dq4; dq5; dq6];
 
-    catch ME
+    elseif isSliding == 1      %sliding
+        % Force of friction is specified and d2x is unknown
+        % Use continuous friction
+        Maug = M_aug_func_slide([l; qB],[dx],[freeParams.muk]);
+        fside = f_func_slide([l; qB; Tau; ldes],[dl; dqB],Fluid_forces);
 
-        % warningCallback(ME.message);
-        dq = zeros(size(q)); % Return zeros if error occurs
+        ddq_aug_slide = Maug^-1*fside; % ddq_aug = [ddl ddqB ddx Fn];
+
+        d2l = ddq_aug_slide(1);
+        d2qB = ddq_aug_slide(2);
+        d2x = ddq_aug_slide(3);
+        Fn = ddq_aug_slide(4);
+
+
+        footVel = dx;
+        Ff = -freeParams.muk*dx*abs(Fn)/(abs(dx) + obj.SimulationInfo.params.epsilonV);  % specified friction
+
+
+        if ( ( abs(footVel) < obj.SimulationInfo.params.epsilonV ) && ( abs(Ff) < freeParams.mus*abs(Fn) ) )
+            isSliding = 0;
+        end
+
+
+
     end
+
+    dq1 = dl; dq2 = d2l;
+    dq3 = dqB; dq4 = d2qB;
+    dq5 = dx;  dq6 = d2x;
+
+    dq = [dq1; dq2; dq3; dq4; dq5; dq6];
+
+
 
 end
 
@@ -215,18 +226,18 @@ function [Fluid_forces] = getFluidForcesUnified(q,freeParams, obj)
     Fdrag = [0;0;0]; % drag force on leg
     Torque_water = [0;0;0]; % torque of drag force about foot;
 
-    numForces = numel(ss_tmp);
+    numForces = numel(obj.SimulationInfo.params.ss_tmp);
     deltaLegDrags = zeros(numForces,3);
     iter = 1;
     for ss = obj.SimulationInfo.params.ss_tmp % integrate over fin
 
         %vel_p = [dx;0;0] + dqB*ss*by_hat;
         vel_p = [dx;0;0] + dqB*ss*by_hat; % velocity of point p. Located at distance ss from the foot.
-        vel_hat = vel_p/norm(vel_p + epsilonV); % unit vector along velocity at point p
+        vel_hat = vel_p/norm(vel_p + obj.SimulationInfo.params.epsilonV); % unit vector along velocity at point p
 
         lambda_hat = cross(vel_hat,[0;0;1]); % unit vector perpendicular to velocity of p
 
-        segment_len_projection = abs( dot(delta_s*bx_hat, lambda_hat) ) ; % length of projection of ds onto lamba
+        segment_len_projection = abs( dot(obj.SimulationInfo.params.delta_s*bx_hat, lambda_hat) ) ; % length of projection of ds onto lamba
 
         Frontal_area = segment_len_projection*wB;
 
@@ -283,7 +294,7 @@ function dldes = dldesFunc(t,obj)
     zdes1 = obj.ODEVariables.traj(idx+1,2);
     ldes1 = sqrt(xdes1^2+zdes1^2);
 
-    dt = 1/freq/length(obj.ODEVariables.traj(:,1));
+    dt = 1/obj.SimulationInfo.freq/length(obj.ODEVariables.traj(:,1));
 
     dldes = (ldes1-ldes)/dt;
 
@@ -302,7 +313,7 @@ function dqBdes = dqBdesFunc(t,obj)
     zdes1 = obj.ODEVariables.traj(idx+1,2);
     qBdes1 = atan2(zdes1,xdes1);
 
-    dt = 1/freq/length(obj.ODEVariables.traj(:,1));
+    dt = 1/obj.SimulationInfo.freq/length(obj.ODEVariables.traj(:,1));
     dqBdes = (qBdes1-qBdes)/dt;
 end
 
@@ -310,7 +321,13 @@ end
 function [value,isterminal,direction] = swim_event_func(t,q, tstart, Fnormal)
 
     value(1) = Fnormal;
-    value(2) = toc(tstart) < 30;
+    value(2) = toc(tstart) < 60;
+    isterminal = true(size(value));  % Stop integration when event occurs
+    direction = -1;  % Detect when Fn crosses zero from positive to negative
+end
+function [value,isterminal,direction] = swim_event_func_no_time(t,q, tstart, Fnormal)
+
+    value(1) = Fnormal;
     isterminal = true(size(value));  % Stop integration when event occurs
     direction = -1;  % Detect when Fn crosses zero from positive to negative
 end
@@ -372,9 +389,6 @@ function obj = getParams()
     x0 = 0;
     dx0 = 0; % initial foot position and velocity
 
-
-    obj.ODEVariables.tspan = [0 obj.SimulationInfo.stance_duration];
-
     obj.ODEVariables.q0 = [l0 dl0 qB0 dqB0 x0 dx0];
 
 
@@ -386,12 +400,94 @@ function obj = getParams()
     obj.SimulationInfo.params.Fbuoy_hip_y = obj.SimulationInfo.params.rho*obj.SimulationInfo.params.Vol_hip*obj.SimulationInfo.params.g;
 
 
-    obj.PSOInfo.LB= [5 0.1 10 0.1 0.1 0.1 0.1];
-    obj.PSOInfo.UB= [30 10 60 3 3 100];
-    obj.PSOInfo.options = optimoptions('particleswarm', 'SwarmSize', 300, 'UseParallel', true);
+    obj.PSOInfo.LB= [0 0.1 10 1 0.1];
+    obj.PSOInfo.UB= [2 4 80 10 3];
+    init_points = ones([8, 5]) .* [8.18/100 1.0 73 7.3 1.5] ;
+    obj.PSOInfo.options = optimoptions('particleswarm', 'SwarmSize', 8, 'UseParallel', true, 'InitialPoints', init_points, 'MaxIterations', 1);
     obj.PSOInfo.nvars = 5;
 
     obj.SimulationInfo.params.dt_inv = obj.SimulationInfo.freq/length(obj.ODEVariables.traj(:,1));
 
 
+end
+
+function f = f_func_stick(in1,in2,in3)
+    %F_FUNC_STICK
+    %    F = F_FUNC_STICK(IN1,IN2,IN3)
+
+    %    This function was generated by the Symbolic Math Toolbox version 23.2.
+    %    24-Feb-2025 14:50:14
+
+    Fbh_y = in3(5,:);
+    Fdh_x = in3(1,:);
+    Fdh_y = in3(2,:);
+    Fdl_x = in3(3,:);
+    Fdl_y = in3(4,:);
+    T_w = in3(6,:);
+    Tau = in1(3,:);
+    dl = in2(1,:);
+    dqB = in2(2,:);
+    l = in1(1,:);
+    ldes = in1(4,:);
+    qB = in1(2,:);
+    t2 = cos(qB);
+    t3 = sin(qB);
+    t4 = dqB.^2;
+    f = [Fdh_x+Fdl_x+dl.*dqB.*t3.*(1.88e+2./5.0)+l.*t2.*t4.*(9.4e+1./5.0);Fbh_y+Fdh_y+Fdl_y-dl.*dqB.*t2.*(1.88e+2./5.0)+l.*t3.*t4.*(9.4e+1./5.0)-1.8447324e+2;l.*-8.003e+3+ldes.*8.003e+3+t3.*(Fbh_y+Fdh_y+Fdl_y-1.8424e+2)+l.*t4.*(9.4e+1./5.0)+t2.*(Fdh_x+Fdl_x);T_w+Tau+l.*t2.*(Fbh_y+Fdh_y-1.8424e+2)-Fdh_x.*l.*t3-Fdl_x.*l.*t3.*5.0e-1+Fdl_y.*l.*t2.*5.0e-1-dl.*dqB.*l.*(1.88e+2./5.0)];
+end
+
+function Maug = M_aug_func_stick(in1)
+    %M_aug_func_stick
+    %    Maug = M_aug_func_stick(IN1)
+
+    %    This function was generated by the Symbolic Math Toolbox version 23.2.
+    %    24-Feb-2025 14:50:14
+
+    l = in1(1,:);
+    qB = in1(2,:);
+    t2 = cos(qB);
+    t3 = sin(qB);
+    Maug = reshape([t2.*(9.4e+1./5.0),t3.*(9.4e+1./5.0),9.4e+1./5.0,0.0,l.*t3.*(-9.4e+1./5.0),l.*t2.*(9.4e+1./5.0),0.0,l.^2.*(9.4e+1./5.0),-1.0,0.0,0.0,0.0,0.0,-1.0,0.0,0.0],[4,4]);
+end
+
+function f = f_func_slide(in1,in2,in3)
+    %F_FUNC_SLIDE
+    %    F = F_FUNC_SLIDE(IN1,IN2,IN3)
+
+    %    This function was generated by the Symbolic Math Toolbox version 23.2.
+    %    24-Feb-2025 14:56:05
+
+    Fbh_y = in3(5,:);
+    Fdh_x = in3(1,:);
+    Fdh_y = in3(2,:);
+    Fdl_x = in3(3,:);
+    Fdl_y = in3(4,:);
+    T_w = in3(6,:);
+    Tau = in1(3,:);
+    dl = in2(1,:);
+    dqB = in2(2,:);
+    l = in1(1,:);
+    ldes = in1(4,:);
+    qB = in1(2,:);
+    t2 = cos(qB);
+    t3 = sin(qB);
+    t4 = dqB.^2;
+    f = [Fdh_x+Fdl_x+dl.*dqB.*t3.*(1.88e+2./5.0)+l.*t2.*t4.*(9.4e+1./5.0);Fbh_y+Fdh_y+Fdl_y-dl.*dqB.*t2.*(1.88e+2./5.0)+l.*t3.*t4.*(9.4e+1./5.0)-1.8447324e+2;l.*-8.003e+3+ldes.*8.003e+3+t3.*(Fbh_y+Fdh_y+Fdl_y-1.8424e+2)+l.*t4.*(9.4e+1./5.0)+t2.*(Fdh_x+Fdl_x);T_w+Tau+l.*t2.*(Fbh_y+Fdh_y-1.8424e+2)-Fdh_x.*l.*t3-Fdl_x.*l.*t3.*5.0e-1+Fdl_y.*l.*t2.*5.0e-1-dl.*dqB.*l.*(1.88e+2./5.0)];
+end
+
+function Maug = M_aug_func_slide(in1,dx,muk)
+    %M_aug_func_slide
+    %    Maug = M_aug_func_slide(IN1,DX,MUK)
+
+    %    This function was generated by the Symbolic Math Toolbox version 23.2.
+    %    24-Feb-2025 14:56:04
+
+    l = in1(1,:);
+    qB = in1(2,:);
+    t2 = cos(qB);
+    t3 = sin(qB);
+    t4 = t2.*(9.4e+1./5.0);
+    t5 = l.*t3.*(9.4e+1./5.0);
+    t6 = -t5;
+    Maug = reshape([t4,t3.*(9.4e+1./5.0),9.4e+1./5.0,0.0,t6,l.*t4,0.0,l.^2.*(9.4e+1./5.0),1.88238e+1,0.0,t4,t6,(dx.*muk)./(abs(dx)+1.0e-5),-1.0,0.0,0.0],[4,4]);
 end
