@@ -400,10 +400,11 @@ function obj = getParams()
     obj.SimulationInfo.params.Fbuoy_hip_y = obj.SimulationInfo.params.rho*obj.SimulationInfo.params.Vol_hip*obj.SimulationInfo.params.g;
 
 
-    obj.PSOInfo.LB= [0 0.1 10 1 0.1];
+    obj.PSOInfo.LB= [0 0.1 65 4 0.1];
     obj.PSOInfo.UB= [2 4 80 10 3];
-    init_points = ones([8, 5]) .* [8.18/100 1.0 73 7.3 1.5] ;
-    obj.PSOInfo.options = optimoptions('particleswarm', 'SwarmSize', 8, 'UseParallel', true, 'InitialPoints', init_points, 'MaxIterations', 1);
+    numparticles = 4;
+    init_points = ones([numparticles, 5]) .* [8.18/100 1.0 73 7.3 1.5] ;
+    obj.PSOInfo.options = optimoptions('particleswarm', 'SwarmSize', numparticles, 'UseParallel', true, 'InitialPoints', init_points, 'MaxIterations', 1);
     obj.PSOInfo.nvars = 5;
 
     obj.SimulationInfo.params.dt_inv = obj.SimulationInfo.freq/length(obj.ODEVariables.traj(:,1));
