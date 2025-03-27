@@ -389,7 +389,7 @@ end
 function [value,isterminal,direction] = swim_event_func(t,q, tstart, Fnormal)
 global TooLong
 
-maxTime = 2;
+maxTime = 10;
 
 if toc(tstart) >= maxTime
 
@@ -481,13 +481,13 @@ obj.SimulationInfo.params.Fbuoy_hip_y = obj.SimulationInfo.params.rho*obj.Simula
 
 % finwidth, muk, kp_ang, kd_ang, mus, epsilonV
 obj.PSOInfo.LB= [0 0 70 3 0 1e-5];
-obj.PSOInfo.UB= [2 2 80 10 3 1e-3];
+obj.PSOInfo.UB= [2 2 90 10 3 1e-3];
 % obj.PSOInfo.LB= [0 1 72 7 0 1e-5];
 % obj.PSOInfo.UB= [1 2 74 8 3 1e-3];
 numparticles = 16;
 % init_points = ones([numparticles, 6]) .* [8.18/100 1.0 73 7.2 1.5 1e-4] ;
 init_points = [];
-obj.PSOInfo.options = optimoptions('particleswarm', 'SwarmSize', numparticles, 'UseParallel', true, 'InitialPoints', init_points, 'MaxIterations', 50);
+obj.PSOInfo.options = optimoptions('particleswarm', 'SwarmSize', numparticles, 'UseParallel', true, 'InitialPoints', init_points, 'MaxIterations', 100);
 % obj.PSOInfo.options = optimoptions('particleswarm', 'SwarmSize', numparticles, 'UseParallel', true, 'InitialPoints', init_points);
 % obj.PSOInfo.options = optimoptions('particleswarm', 'SwarmSize', numparticles, 'UseParallel', false, 'InitialPoints', init_points, 'MaxIterations', 1);
 obj.PSOInfo.nvars = 6;
