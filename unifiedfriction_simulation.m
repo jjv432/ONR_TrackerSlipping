@@ -6,9 +6,13 @@ load("T_Results.mat");
 
 bigTimerVal = tic;
 
-for aa = [9:18]
+delete(gcp("nocreate")); % just in case one is still running
+
+for aa = [1:7, 9:18]
 
     clearvars -except results time_results t aa bigTimerVal
+    clear persistent % make sure persistent vars clear
+    clc
 
     %%
 
@@ -27,6 +31,7 @@ for aa = [9:18]
 
     obj = getParams(freq);
 
+
     % p = polyfit(cur_t_vals, cur_x_vals, 13);
     p = polyfit(cur_t_vals, cur_x_vals, 7);
 
@@ -40,15 +45,6 @@ for aa = [9:18]
     %  FIX THIS!!!!!
     obj.ODEVariables.tspan = t_results.t(1:StatsLength);
 
-    %% Testing
-
-    parm = [8.18/100 1.0 73 7.2];
-
-    % [x t] = UnifiedModelLight(parm, obj, 0);
-    % figure()
-    % plot(t,x)
-
-
 
     %% Run PSO
 
@@ -58,7 +54,9 @@ for aa = [9:18]
     psoTimer = tic;
     [OptimizedState, FVAL] = particleswarm(costFunctionHandle, obj.PSOInfo.nvars, obj.PSOInfo.LB, obj.PSOInfo.UB, obj.PSOInfo.options);
     delete(gcp("nocreate"))
-    pause(10);
+
+
+    pause(30);
 
 
     fprintf("\n\nPSO Completed in %.3f seconds", toc(psoTimer));
@@ -84,20 +82,17 @@ for aa = [9:18]
     saveas(gcf, strcat("ResultsFor", string(aa), ".jpg"));
     close
 
-    results = [results; OptimizedState];
+    writematrix(OptimizedState, strcat("ParamsFor", string(aa), ".txt"));
+
+    pause(30);
 
 end
-
-
-
 
 fprintf("\n\nAll PSO Completed in %.3f seconds", toc(bigTimerVal));
 aa
 
 
-
-
-%%
+%% PSO Internals
 
 function [Cost] = ModelSimulationCost(freeParams, obj, p)
 
@@ -392,22 +387,22 @@ end
 
 % Event function to detect liftoff
 function [value,isterminal,direction] = swim_event_func(t,q, tstart, Fnormal)
-global TooLong maxTime
+global TooLong
 
-maxTime = 10;
+maxTime = 2;
 
-
-if toc(tstart) >= 10
+if toc(tstart) >= maxTime
 
     TooLong = 1;
 else
     TooLong = 0;
 end
 value(1) = Fnormal;
-value(2) = toc(tstart) < 10;
+value(2) = toc(tstart) < maxTime;
 isterminal = true(size(value));  % Stop integration when event occurs
 direction = -1;  % Detect when Fn crosses zero from positive to negative
 end
+
 function [value,isterminal,direction] = swim_event_func_no_time(t,q, tstart, Fnormal)
 
 value(1) = Fnormal;
@@ -484,14 +479,16 @@ obj.SimulationInfo.params.deltaLegDrags = zeros(obj.SimulationInfo.params.numFor
 obj.SimulationInfo.params.Vol_hip = (4/3)*pi*obj.SimulationInfo.params.R^3;
 obj.SimulationInfo.params.Fbuoy_hip_y = obj.SimulationInfo.params.rho*obj.SimulationInfo.params.Vol_hip*obj.SimulationInfo.params.g;
 
-
-obj.PSOInfo.LB= [0 1 72 7 0 1e-5];
-obj.PSOInfo.UB= [1 2 74 8 3 1e-3];
-numparticles = 32;
-% init_points = ones([numparticles/2, 5]) .* [8.18/100 1.0 73 7.2 1.5] ;
+% finwidth, muk, kp_ang, kd_ang, mus, epsilonV
+obj.PSOInfo.LB= [0 0 70 3 0 1e-5];
+obj.PSOInfo.UB= [2 2 80 10 3 1e-3];
+% obj.PSOInfo.LB= [0 1 72 7 0 1e-5];
+% obj.PSOInfo.UB= [1 2 74 8 3 1e-3];
+numparticles = 16;
+% init_points = ones([numparticles, 6]) .* [8.18/100 1.0 73 7.2 1.5 1e-4] ;
 init_points = [];
-% obj.PSOInfo.options = optimoptions('particleswarm', 'SwarmSize', numparticles, 'UseParallel', true, 'InitialPoints', init_points, 'MaxIterations', 25);
-obj.PSOInfo.options = optimoptions('particleswarm', 'SwarmSize', numparticles, 'UseParallel', true, 'InitialPoints', init_points);
+obj.PSOInfo.options = optimoptions('particleswarm', 'SwarmSize', numparticles, 'UseParallel', true, 'InitialPoints', init_points, 'MaxIterations', 50);
+% obj.PSOInfo.options = optimoptions('particleswarm', 'SwarmSize', numparticles, 'UseParallel', true, 'InitialPoints', init_points);
 % obj.PSOInfo.options = optimoptions('particleswarm', 'SwarmSize', numparticles, 'UseParallel', false, 'InitialPoints', init_points, 'MaxIterations', 1);
 obj.PSOInfo.nvars = 6;
 
