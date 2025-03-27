@@ -1,5 +1,9 @@
 clc; clear all; close all; format compact;
 
+
+addpath("Plots/");
+addpath("Results/");
+
 results = [];
 time_results = [];
 load("T_Results.mat");
@@ -79,10 +83,10 @@ for aa = [1:7, 9:18]
     legend("Best Simulation", "Experimental Data");
     title("results for " + string(aa))
 
-    saveas(gcf, strcat("ResultsFor", string(aa), ".jpg"));
+    saveas(gcf, strcat("Plots/ResultsFor", string(aa), ".jpg"));
     close
 
-    writematrix(OptimizedState, strcat("ParamsFor", string(aa), ".txt"));
+    writematrix(OptimizedState, strcat("Results/ParamsFor", string(aa), ".txt"));
 
     pause(30);
 
