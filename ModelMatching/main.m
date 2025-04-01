@@ -3,6 +3,7 @@ clc; clear all; close all; format compact;
 
 addpath("Plots/");
 addpath("Results/");
+addpath("src");
 
 results = [];
 time_results = [];
@@ -11,6 +12,13 @@ load("T_Results.mat");
 bigTimerVal = tic;
 
 delete(gcp("nocreate")); % just in case one is still running
+parpool
+
+% contraining muk < mus
+function [c, ceq] = constraintFn(x)
+c = x(2) - .75*x(5);
+ceq = [];
+end
 
 for aa = [1:7, 9:18]
 
@@ -56,16 +64,17 @@ for aa = [1:7, 9:18]
 
     disp("Starting PSO...");
     psoTimer = tic;
-    [OptimizedState, FVAL] = particleswarm(costFunctionHandle, obj.PSOInfo.nvars, obj.PSOInfo.LB, obj.PSOInfo.UB, obj.PSOInfo.options);
-    delete(gcp("nocreate"))
+    % [OptimizedState, FVAL] = particleswarm(costFunctionHandle, obj.PSOInfo.nvars, obj.PSOInfo.LB, obj.PSOInfo.UB, obj.PSOInfo.options);
+    % delete(gcp("nocreate"))
 
+    % X: finwidth, muk, kp_ang, kd_ang, mus, epsilonV
+
+
+    OptimizedState = ga(costFunctionHandle, obj.PSOInfo.nvars, [], [], [], [], obj.PSOInfo.LB, obj.PSOInfo.UB, @constraintFn, obj.gaInfo.options);
 
     pause(30);
 
-
     fprintf("\n\nPSO Completed in %.3f seconds", toc(psoTimer));
-
-
 
     disp(OptimizedState);
 
@@ -489,9 +498,10 @@ obj.PSOInfo.UB= [2 2 90 10 3 1e-3];
 % obj.PSOInfo.LB= [0 1 72 7 0 1e-5];
 % obj.PSOInfo.UB= [1 2 74 8 3 1e-3];
 numparticles = 16;
-% init_points = ones([numparticles, 6]) .* [8.18/100 1.0 73 7.2 1.5 1e-4] ;
-init_points = [];
-obj.PSOInfo.options = optimoptions('particleswarm', 'SwarmSize', numparticles, 'UseParallel', true, 'InitialPoints', init_points, 'MaxIterations', 100);
+init_points = ones([numparticles, 6]) .* [8.18/100 1.0 73 7.2 1.5 1e-4] ;
+% init_points = [];
+% obj.PSOInfo.options = optimoptions('particleswarm', 'SwarmSize', numparticles, 'UseParallel', true, 'InitialPoints', init_points, 'MaxIterations', 100);
+obj.gaInfo.options = optimoptions('ga', 'PopulationSize', numparticles, 'UseParallel', true, 'InitialPopulationMatrix', init_points, 'MaxGenerations', 100);
 % obj.PSOInfo.options = optimoptions('particleswarm', 'SwarmSize', numparticles, 'UseParallel', true, 'InitialPoints', init_points);
 % obj.PSOInfo.options = optimoptions('particleswarm', 'SwarmSize', numparticles, 'UseParallel', false, 'InitialPoints', init_points, 'MaxIterations', 1);
 obj.PSOInfo.nvars = 6;
